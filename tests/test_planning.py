@@ -7,20 +7,45 @@ from situlearn.knowledge import (
     TermCategory,
 )
 from situlearn.models import Segment
-from situlearn.planning import ExtractedTerms, to_term_candidates
+from situlearn.planning import (
+    ExtractedTerms,
+    PlannedNarrative,
+    to_narrative_script,
+    to_term_candidates,
+)
 
 
-def _segment() -> Segment:
+def _segment(index: int = 1) -> Segment:
     return Segment(
-        segment_id="seg-0001",
-        cue_ids=[1, 2],
-        start_ms=0,
-        end_ms=10_000,
+        segment_id=f"seg-{index:04d}",
+        cue_ids=[index * 2 - 1, index * 2],
+        start_ms=(index - 1) * 10_000,
+        end_ms=index * 10_000,
         text=(
             "The biographer Zosimus. "
             "He lived in Constantinople and wrote about the court."
         ),
     )
+
+
+def _planned_payload(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "title": "测试叙事",
+        "logline": "这是一句话简介。",
+        "background": "背" * 143,
+        "sections": [
+            {
+                "heading": f"第{index}章节标题",
+                "summary": "摘" * 79,
+                "spoken_text": "播" * 100,
+                "segment_ids": [f"seg-{index:04d}"],
+                "key_terms": ["term"],
+            }
+            for index in range(1, 5)
+        ],
+    }
+    payload.update(overrides)
+    return payload
 
 
 def _script() -> NarrativeScript:
@@ -144,3 +169,66 @@ def test_duplicate_lemmas_keep_the_first_item() -> None:
 
     assert len(candidates) == 1
     assert candidates[0].term == "Zosimus"
+
+
+def test_narrative_accepts_prose_slightly_under_prompt_target() -> None:
+    # Regression: a 143-character background and 79-character summary were
+    # rejected even though the narrative itself was perfectly usable.
+    planned = PlannedNarrative.model_validate(_planned_payload())
+
+    script = to_narrative_script(planned, [_segment(index) for index in range(1, 5)])
+
+    assert len(script.sections) == 4
+    assert script.background == "背" * 143
+    assert script.sections[0].summary == "摘" * 79
+
+
+def test_narrative_clamps_overlong_prose_to_schema_maxima() -> None:
+    payload = _planned_payload(
+        background="背" * 700,
+        sections=[
+            {
+                "heading": "标" * 30,
+                "summary": "摘" * 400,
+                "spoken_text": "播" * 1_300,
+                "segment_ids": [f"seg-{index:04d}"],
+                "key_terms": [f"term-{item}" for item in range(15)],
+            }
+            for index in range(1, 5)
+        ],
+    )
+    planned = PlannedNarrative.model_validate(payload)
+
+    script = to_narrative_script(planned, [_segment(index) for index in range(1, 5)])
+
+    assert len(script.background) == 600
+    assert len(script.sections[0].heading) == 20
+    assert len(script.sections[0].summary) == 300
+    assert len(script.sections[0].spoken_text) == 1_200
+    assert len(script.sections[0].key_terms) == 12
+
+
+def test_narrative_falls_back_when_optional_prose_is_missing() -> None:
+    payload = _planned_payload(
+        title=None,
+        logline=None,
+        background=None,
+        sections=[
+            {
+                "heading": "",
+                "summary": None,
+                "spoken_text": None,
+                "segment_ids": [f"seg-{index:04d}"],
+            }
+            for index in range(1, 5)
+        ],
+    )
+    planned = PlannedNarrative.model_validate(payload)
+
+    script = to_narrative_script(planned, [_segment(index) for index in range(1, 5)])
+
+    assert script.title == "学习报告"
+    assert script.background == "学习报告"
+    assert script.sections[0].heading == "第1节"
+    assert script.sections[0].summary == "第1节"
+    assert script.sections[0].spoken_text == "第1节"

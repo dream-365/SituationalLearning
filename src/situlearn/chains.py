@@ -33,15 +33,15 @@ LATIN_RE = re.compile(r"[A-Za-z][A-Za-z'’-]*")
 
 class SectionTextPatch(BaseModel):
     section_id: str = Field(min_length=1)
-    heading: str = Field(min_length=4, max_length=20)
-    summary: str = Field(min_length=80, max_length=300)
-    spoken_text: str = Field(min_length=100, max_length=1_200)
+    heading: str = Field(min_length=1, max_length=20)
+    summary: str = Field(min_length=1, max_length=300)
+    spoken_text: str = Field(min_length=1, max_length=1_200)
 
 
 class NarrativeTextPatch(BaseModel):
-    title: str = Field(min_length=2, max_length=30)
-    logline: str = Field(min_length=20, max_length=120)
-    background: str = Field(min_length=150, max_length=600)
+    title: str = Field(min_length=1, max_length=30)
+    logline: str = Field(min_length=1, max_length=120)
+    background: str = Field(min_length=1, max_length=600)
     sections: list[SectionTextPatch] = Field(
         min_length=4,
         max_length=8,

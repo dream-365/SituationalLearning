@@ -33,13 +33,15 @@ class SourceRef(BaseModel):
 
 
 class NarrativeSection(BaseModel):
+    # Prose length ranges live in the prompt as quality targets. The schema
+    # only rejects empty/oversized text so a near miss stays renderable.
     section_id: str = Field(min_length=1)
-    heading: str = Field(min_length=4, max_length=20)
+    heading: str = Field(min_length=1, max_length=20)
     start_ms: int = Field(ge=0)
     end_ms: int = Field(ge=0)
-    summary: str = Field(min_length=80, max_length=300)
+    summary: str = Field(min_length=1, max_length=300)
     key_terms: list[str] = Field(default_factory=list, max_length=12)
-    spoken_text: str = Field(min_length=40)
+    spoken_text: str = Field(min_length=1)
     audio_refs: list[str] = Field(default_factory=list)
     audio_status: AudioStatus = AudioStatus.UNAVAILABLE
 
@@ -53,9 +55,9 @@ class NarrativeSection(BaseModel):
 
 
 class NarrativeScript(BaseModel):
-    title: str = Field(min_length=2, max_length=30)
-    logline: str = Field(min_length=20, max_length=120)
-    background: str = Field(min_length=150, max_length=600)
+    title: str = Field(min_length=1, max_length=30)
+    logline: str = Field(min_length=1, max_length=120)
+    background: str = Field(min_length=1, max_length=600)
     sections: list[NarrativeSection] = Field(min_length=4, max_length=8)
 
     @model_validator(mode="after")

@@ -8,6 +8,13 @@ updated_at: 2026-11-02
 
 # Changelog: SPEC-001 情景学习
 
+## [2026-11-02] - 叙事散文字数不再作为硬校验
+
+- **修改类型**: Fixed
+- **影响范围**: 4.2 `PlannedNarrative` / `NarrativeSection` / `NarrativeScript`；3.2 Narrative Planner；中文修复链
+- **变更原因**: 第二集生成 143 字 `background`、79 字章节 `summary`，分别只差 7 字和 1 字达到提示词目标，却触发 Pydantic 校验失败；三次重试返回近似结果，构建在叙事阶段、已等待 LLM 数分钟后终止
+- **具体内容**: `PlannedNarrative` / `PlannedSection` 改为宽松传输模型，容忍缺失字段并逐项归一；`to_narrative_script` 统一去空白、按 schema 上限截断、为缺失字段提供回退；`NarrativeSection` / `NarrativeScript` 的散文字段只要求非空，150/80 字仍保留为提示词质量目标；中文修复补丁模型同步放宽下限，避免短文本导致整次修复被丢弃。
+
 ## [2026-11-02] - LLM 输出逐条容错
 
 - **修改类型**: Fixed

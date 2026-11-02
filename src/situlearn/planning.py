@@ -18,18 +18,43 @@ from situlearn.models import Segment
 
 
 class PlannedSection(BaseModel):
-    heading: str = Field(min_length=4, max_length=20)
-    summary: str = Field(min_length=80, max_length=300)
-    spoken_text: str = Field(min_length=100, max_length=1_200)
-    segment_ids: list[str] = Field(min_length=1)
-    key_terms: list[str] = Field(default_factory=list, max_length=12)
+    """Lenient transport model for one planned narrative section.
+
+    Prose lengths are prompt guidance, not schema integrity: a summary a few
+    characters under target must not abort a multi-minute build. Values are
+    trimmed and clamped to the canonical maxima in ``to_narrative_script``.
+    """
+
+    heading: str | None = None
+    summary: str | None = None
+    spoken_text: str | None = None
+    segment_ids: list[str] = Field(default_factory=list)
+    key_terms: list[str] = Field(default_factory=list)
+
+    @field_validator("segment_ids", "key_terms", mode="before")
+    @classmethod
+    def _keep_strings(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, str)]
+        return []
 
 
 class PlannedNarrative(BaseModel):
-    title: str = Field(min_length=2, max_length=30)
-    logline: str = Field(min_length=20, max_length=120)
-    background: str = Field(min_length=150, max_length=600)
+    title: str | None = None
+    logline: str | None = None
+    background: str | None = None
     sections: list[PlannedSection] = Field(min_length=4, max_length=8)
+
+    @field_validator("sections", mode="before")
+    @classmethod
+    def _drop_malformed_sections(cls, value: object) -> object:
+        if isinstance(value, dict):
+            value = [value]
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, (dict, PlannedSection))]
 
 
 class ExtractedTerm(BaseModel):
@@ -74,7 +99,12 @@ class ExtractedTerms(BaseModel):
 
 
 def to_narrative_script(planned: PlannedNarrative, segments: list[Segment]) -> NarrativeScript:
-    """Resolve segment references into timestamps and section ids."""
+    """Resolve segment references into timestamps and section ids.
+
+    Prose is trimmed and clamped to the canonical maxima here. Short prose is
+    kept as-is: the prompt asks for 150/80 characters, but a near miss is
+    usable content and must not fail the build.
+    """
 
     index = {segment.segment_id: segment for segment in segments}
     sections: list[NarrativeSection] = []
@@ -87,26 +117,47 @@ def to_narrative_script(planned: PlannedNarrative, segments: list[Segment]) -> N
         ]
         if not selected:
             continue
+        heading = _clamp(item.heading, 20) or f"第{ordinal}节"
+        spoken_text = _clamp(item.spoken_text, 1_200)
+        summary = _clamp(item.summary, 300)
+        if not spoken_text:
+            spoken_text = summary
+        if not summary:
+            summary = _clamp(spoken_text, 300) or heading
+        if not spoken_text:
+            spoken_text = heading
         sections.append(
             NarrativeSection(
                 section_id=f"sec-{ordinal:02d}",
-                heading=item.heading,
+                heading=heading,
                 start_ms=min(segment.start_ms for segment in selected),
                 end_ms=max(segment.end_ms for segment in selected),
-                summary=item.summary,
-                key_terms=item.key_terms,
-                spoken_text=item.spoken_text,
+                summary=summary,
+                key_terms=_key_terms(item.key_terms),
+                spoken_text=spoken_text,
                 audio_refs=[],
                 audio_status=AudioStatus.UNAVAILABLE,
             )
         )
 
+    title = _clamp(planned.title, 30) or "学习报告"
+    logline = _clamp(planned.logline, 120) or title
     return NarrativeScript(
-        title=planned.title,
-        logline=planned.logline,
-        background=planned.background,
+        title=title,
+        logline=logline,
+        background=_clamp(planned.background, 600) or logline,
         sections=sections,
     )
+
+
+def _clamp(value: str | None, limit: int) -> str:
+    text = " ".join(value.split()) if isinstance(value, str) else ""
+    return text[:limit]
+
+
+def _key_terms(value: list[str]) -> list[str]:
+    terms = [term.strip() for term in value if term.strip()]
+    return list(dict.fromkeys(terms))[:12]
 
 
 def to_term_candidates(

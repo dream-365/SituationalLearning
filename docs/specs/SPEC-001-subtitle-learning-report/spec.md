@@ -214,15 +214,15 @@ flowchart TD
 | `Segment` | `cue_ids` | int[] | 是 | 非空且均存在于 `Cue[]` |
 | `Segment` | `start_ms` / `end_ms` | int | 是 | 覆盖所含 cue 的时间范围 |
 | `NarrativeSection` | `section_id` | string | 是 | 同一报告内唯一 |
-| `NarrativeSection` | `heading` | string | 是 | 4–20 字，口语化小标题 |
+| `NarrativeSection` | `heading` | string | 是 | 1–20 字；口语化小标题（提示词目标 4–20 字） |
 | `NarrativeSection` | `start_ms` / `end_ms` | int | 是 | 必须落在字幕总时长内 |
-| `NarrativeSection` | `summary` | string | 是 | 80–300 字，说明本节讲了什么 |
+| `NarrativeSection` | `summary` | string | 是 | 1–300 字，说明本节讲了什么（提示词目标 80–300 字） |
 | `NarrativeSection` | `key_terms` | string[] | 是 | 0–12 个，必须能在词表中找到 |
 | `NarrativeSection` | `spoken_text` | string | 是 | 全中文口语播报稿；英文人名、作品名、术语用通行中文译名或简短解释，不夹带英文原词；不含书面摘要套话 |
 | `NarrativeSection` | `audio_refs` | string[] | 是 | 指向 `assets/audio/` 下的一个或多个文件，按播放顺序排列 |
 | `NarrativeSection` | `audio_status` | enum | 是 | `ready` / `partial` / `unavailable`；`ready` 时 `audio_refs` 非空 |
-| `NarrativeScript` | `title` / `logline` | string | 是 | 标题 2–30 字；一句话定位 20–120 字 |
-| `NarrativeScript` | `background` | string | 是 | 150–600 字，交代主题背景与人物/作品关系 |
+| `NarrativeScript` | `title` / `logline` | string | 是 | 标题 1–30 字；一句话定位 1–120 字（提示词目标 20–120 字） |
+| `NarrativeScript` | `background` | string | 是 | 1–600 字，交代主题背景与人物/作品关系（提示词目标 150–600 字） |
 | `NarrativeScript` | `sections` | `NarrativeSection[]` | 是 | 数量 4–8 |
 | `TermCandidate` | `term` / `lemma` | string | 是 | 展示形与词元；专名允许两者相同 |
 | `TermCandidate` | `surface_forms` | string[] | 是 | 至少 1 项，均为字幕中真实出现的形态 |
