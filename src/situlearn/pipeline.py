@@ -32,12 +32,14 @@ from situlearn.knowledge import (
     TermEntry,
 )
 from situlearn.llm import make_chat_model
+from situlearn.progress import Progress
 from situlearn.report import assemble_report
 from situlearn.segmenter import segment_cues
 from situlearn.srt import parse_srt
 from situlearn.tts import XiaomiTTS
 
 PROMPT_VERSION = "v2"
+DEFAULT_CACHE_ROOT = Path.home() / ".cache" / "situlearn"
 
 
 @dataclass
@@ -181,42 +183,69 @@ def build_report(
     no_audio: bool = False,
     force: bool = False,
     cache_root: Path | None = None,
+    progress: Progress | None = None,
 ) -> BuildResult:
     started = time.time()
+    progress = progress or Progress()
     input_path = input_path.expanduser().resolve()
     out_dir = out_dir.expanduser().resolve()
     warnings: list[str] = []
 
     cues = parse_srt(input_path)
+    progress.stage(f"解析字幕：{len(cues)} 条")
     segments = segment_cues(cues)
+    progress.stage(f"内容切分：{len(segments)} 个片段")
     input_sha = _sha256_file(input_path)
-    cache_base = cache_root or Path(".cache")
+    cache_base = cache_root or DEFAULT_CACHE_ROOT
     run_cache = cache_base / input_sha[:16]
     run_cache.mkdir(parents=True, exist_ok=True)
+    progress.stage(f"缓存目录：{cache_base}")
 
     llm = make_chat_model()
-    script = _load_or_create_narrative(
-        llm, segments, run_cache / f"narrative-{PROMPT_VERSION}.json", force=force
+    narrative_path = run_cache / f"narrative-{PROMPT_VERSION}.json"
+    progress.stage(
+        "叙事脉络：命中缓存"
+        if narrative_path.exists() and not force
+        else "叙事脉络：调用 LLM 生成（首次约 1-2 分钟）"
+    )
+    script = _load_or_create_narrative(llm, segments, narrative_path, force=force)
+
+    terms_path = run_cache / f"terms-{PROMPT_VERSION}.json"
+    progress.stage(
+        "术语提取：命中缓存"
+        if terms_path.exists() and not force
+        else "术语提取：调用 LLM 分析字幕"
     )
     candidates = _load_or_create_terms(
         llm,
         segments,
         script,
-        run_cache / f"terms-{PROMPT_VERSION}.json",
+        terms_path,
         force=force,
     )
 
     if not terms_min <= len(candidates) <= terms_max:
         warnings.append(f"term_count_out_of_range={len(candidates)}")
 
-    dictionary = _load_or_create_dictionary(
-        candidates, run_cache / "dictionary.json", force=force
+    dictionary_path = run_cache / "dictionary.json"
+    progress.stage(
+        "词典查询：命中缓存"
+        if dictionary_path.exists() and not force
+        else f"词典查询：{len(candidates)} 个词条"
+    )
+    dictionary = _load_or_create_dictionary(candidates, dictionary_path, force=force)
+
+    gloss_path = run_cache / f"gloss-{PROMPT_VERSION}.json"
+    progress.stage(
+        "释义生成：命中缓存"
+        if gloss_path.exists() and not force
+        else "释义生成：调用 LLM 编写中英释义"
     )
     terms: list[TermEntry] = _load_or_create_gloss(
         llm,
         candidates,
         dictionary,
-        run_cache / f"gloss-{PROMPT_VERSION}.json",
+        gloss_path,
         force=force,
     )
     if not terms:
@@ -226,6 +255,7 @@ def build_report(
 
     assets: list[AudioAsset] = []
     if no_audio:
+        progress.stage("音频：已通过 --no-audio 跳过")
         for section in script.sections:
             section.audio_refs = []
             section.audio_status = AudioStatus.UNAVAILABLE
@@ -238,15 +268,20 @@ def build_report(
         cache = AudioCache(cache_base / "audio")
         limiter = RateLimiter(90)
         assets_dir = out_dir / "assets" / "audio"
+        progress.stage(f"真人发音：检查 {len(terms)} 个词条")
         human_audio: dict[str, HumanAudio | None] = resolve_human_audio(
             terms,
             candidates,
             cache_dir=cache_base / "human_audio",
             cache_path=run_cache / "human_audio.json",
             force=force,
+            on_item=lambda index, total: progress.counter("真人发音", index, total),
         )
+        progress.finish()
 
-        for section in script.sections:
+        progress.stage(f"章节音频：{len(script.sections)} 段")
+        for index, section in enumerate(script.sections, start=1):
+            progress.counter("章节音频", index, len(script.sections))
             refs, status = synthesize_section(
                 tts, cache, limiter, section, assets_dir, voice=voice
             )
@@ -256,8 +291,11 @@ def build_report(
                 assets.append(_asset_for(ref, section.spoken_text, AudioSource.TTS))
             if status is not AudioStatus.READY:
                 warnings.append(f"{section.section_id}_audio_{status.value}")
+        progress.finish()
 
-        for term in terms:
+        progress.stage(f"词条音频：{len(terms)} 个词条")
+        for index, term in enumerate(terms, start=1):
+            progress.counter("词条音频", index, len(terms))
             human = human_audio.get(term.term)
             if human is not None:
                 slug = hashlib.sha256(term.term.casefold().encode()).hexdigest()[:12]
@@ -291,6 +329,8 @@ def build_report(
             else:
                 warnings.append(f"term_audio_unavailable={term.term}")
 
+        progress.finish()
+
         if assets_dir.exists():
             referenced = {Path(asset.path).name for asset in assets}
             for path in assets_dir.glob("*.mp3"):
@@ -322,6 +362,7 @@ def build_report(
         warnings=warnings,
     )
 
+    progress.stage("生成报告：manifest.json + report.html")
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = out_dir / "manifest.json"
     manifest_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")

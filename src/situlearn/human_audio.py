@@ -7,6 +7,7 @@ import json
 import re
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -217,6 +218,7 @@ def resolve_human_audio(
     cache_path: Path,
     force: bool = False,
     workers: int = 2,
+    on_item: Callable[[int, int], None] | None = None,
 ) -> dict[str, HumanAudio | None]:
     """Resolve human audio for every term, caching MP3 bytes and metadata."""
 
@@ -258,8 +260,11 @@ def resolve_human_audio(
 
         try:
             with ThreadPoolExecutor(max_workers=workers) as pool:
-                for term_name, hit in pool.map(work, pending):
+                total = len(pending)
+                for index, (term_name, hit) in enumerate(pool.map(work, pending), start=1):
                     cached[term_name] = hit
+                    if on_item is not None:
+                        on_item(index, total)
         finally:
             resolver.close()
 

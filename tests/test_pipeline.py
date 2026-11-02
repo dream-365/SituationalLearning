@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import StringIO
 from pathlib import Path
 
 from situlearn import pipeline
@@ -13,6 +14,7 @@ from situlearn.knowledge import (
     TermCategory,
     TermEntry,
 )
+from situlearn.progress import Progress
 
 
 def _script() -> NarrativeScript:
@@ -93,13 +95,19 @@ def test_build_report_no_audio(tmp_path: Path, monkeypatch) -> None:
         pipeline, "gloss_terms", lambda llm, terms, dictionary: [entry]
     )
 
+    progress_out = StringIO()
     result = pipeline.build_report(
         srt,
         tmp_path / "out",
         no_audio=True,
         cache_root=tmp_path / ".cache",
+        progress=Progress(progress_out),
     )
 
+    messages = progress_out.getvalue()
+    assert "解析字幕：4 条" in messages
+    assert "内容切分：1 个片段" in messages
+    assert "--no-audio" in messages
     assert result.report_path.exists()
     assert result.manifest_path.exists()
     assert result.cue_count == 4

@@ -201,7 +201,7 @@ flowchart TD
 | `tts_speed` | 1.0 | v0.1 固定 1.0；小米 TTS 无原生 speed 参数 |
 | `dictionary_timeout_s` | 5 | 单次词典请求超时 |
 | `audio_max_bytes` | 5,242,880 | 单个音频文件上限 |
-| `cache_dir` | `.cache/` | 阶段与音频缓存目录 |
+| `cache_dir` | `~/.cache/situlearn/` | 阶段与音频缓存目录 |
 
 ### 4.3 数据模型与契约
 

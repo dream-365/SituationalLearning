@@ -8,6 +8,7 @@ from pathlib import Path
 
 from situlearn import __version__
 from situlearn.pipeline import build_report
+from situlearn.progress import Progress
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -43,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
             terms_max=args.terms_max,
             no_audio=args.no_audio,
             force=args.force,
+            progress=Progress(sys.stderr),
         )
     except Exception as exc:  # noqa: BLE001 - CLI boundary reports any failure to the user
         print(f"situlearn: {exc}", file=sys.stderr)

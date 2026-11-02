@@ -20,7 +20,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Install the released CLI:
 
 ```bash
-uv tool install --python 3.12 https://github.com/dream-365/SituationalLearning/releases/download/v0.1.0/situlearn-0.1.0-py3-none-any.whl
+uv tool install --python 3.12 https://github.com/dream-365/SituationalLearning/releases/download/v0.1.1/situlearn-0.1.1-py3-none-any.whl
 ```
 
 If PyPI is slow, set `HTTPS_PROXY` to your local proxy before installing.
@@ -40,7 +40,7 @@ situlearn build your-documentary.en.srt --out reports/your-documentary
 open reports/your-documentary/report.html
 ```
 
-The build writes `report.html`, `manifest.json`, and `assets/audio/` into the output directory. The generated report is fully offline.
+The build writes `report.html`, `manifest.json`, and `assets/audio/` into the output directory. The generated report is fully offline. Progress is printed to stderr as each stage runs; stage and audio caches live in `~/.cache/situlearn/` and are reused on the next build unless `--force` is passed.
 
 ## Run from source
 
