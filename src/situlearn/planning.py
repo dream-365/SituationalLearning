@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 import re
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from situlearn.knowledge import (
     AudioStatus,
@@ -32,18 +33,44 @@ class PlannedNarrative(BaseModel):
 
 
 class ExtractedTerm(BaseModel):
-    term: str = Field(min_length=1)
-    lemma: str = Field(min_length=1)
-    surface_forms: list[str] = Field(min_length=1)
-    category: TermCategory
-    context_sentence: str = Field(min_length=10, max_length=300)
-    segment_id: str = Field(min_length=1)
-    why_it_matters: str = Field(min_length=15, max_length=120)
-    confidence: float = Field(ge=0.0, le=1.0)
+    """Lenient transport model for raw LLM output.
+
+    Field constraints are intentionally loose. A single out-of-range value must
+    not fail the whole extraction run, so canonical constraints live in
+    ``TermCandidate`` and are enforced after normalisation in
+    ``to_term_candidates``.
+    """
+
+    term: str | None = None
+    lemma: str | None = None
+    surface_forms: list[str] | None = None
+    category: str | None = None
+    context_sentence: str | None = None
+    segment_id: str | None = None
+    why_it_matters: str | None = None
+    confidence: float | str | None = None
+
+    @field_validator("surface_forms", mode="before")
+    @classmethod
+    def _wrap_single_form(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, list):
+            return [form for form in value if isinstance(form, str)]
+        return []
 
 
 class ExtractedTerms(BaseModel):
-    terms: list[ExtractedTerm] = Field(min_length=1)
+    terms: list[ExtractedTerm] = Field(default_factory=list)
+
+    @field_validator("terms", mode="before")
+    @classmethod
+    def _drop_malformed_entries(cls, value: object) -> object:
+        if isinstance(value, dict):
+            value = [value]
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, (dict, ExtractedTerm))]
 
 
 def to_narrative_script(planned: PlannedNarrative, segments: list[Segment]) -> NarrativeScript:
@@ -53,10 +80,13 @@ def to_narrative_script(planned: PlannedNarrative, segments: list[Segment]) -> N
     sections: list[NarrativeSection] = []
 
     for ordinal, item in enumerate(planned.sections, start=1):
-        missing = [segment_id for segment_id in item.segment_ids if segment_id not in index]
-        if missing:
-            raise ValueError(f"unknown segment ids: {missing}")
-        selected = [index[segment_id] for segment_id in item.segment_ids]
+        selected = [
+            index[segment_id]
+            for segment_id in dict.fromkeys(item.segment_ids)
+            if segment_id in index
+        ]
+        if not selected:
+            continue
         sections.append(
             NarrativeSection(
                 section_id=f"sec-{ordinal:02d}",
@@ -84,7 +114,11 @@ def to_term_candidates(
     segments: list[Segment],
     script: NarrativeScript,
 ) -> list[TermCandidate]:
-    """Map extracted terms to cues and sections, de-duplicating by lemma."""
+    """Map extracted terms to cues and sections, de-duplicating by lemma.
+
+    Items that cannot be normalised into a valid ``TermCandidate`` are dropped
+    individually instead of failing the whole batch.
+    """
 
     segment_index = {segment.segment_id: segment for segment in segments}
     section_spans = [(section.section_id, section.start_ms, section.end_ms) for section in script.sections]
@@ -92,30 +126,64 @@ def to_term_candidates(
     candidates: list[TermCandidate] = []
 
     for item in extracted.terms:
-        key = item.lemma.casefold().strip()
+        term = _text(item.term)
+        lemma = _text(item.lemma) or term
+        segment_id = _text(item.segment_id)
+        if not term or not lemma or segment_id not in segment_index:
+            continue
+        key = lemma.casefold()
         if key in seen:
             continue
-        segment = segment_index.get(item.segment_id)
-        if segment is None:
+
+        segment = segment_index[segment_id]
+        context = _context_in_segment(_text(item.context_sentence), term, segment.text)
+        why_it_matters = _text(item.why_it_matters)[:120]
+        if len(context) < 10 or len(why_it_matters) < 15:
             continue
+
         seen.add(key)
-        section_id = _section_for(segment.start_ms, section_spans)
-        context = _context_in_segment(item.context_sentence, item.term, segment.text)
         candidates.append(
             TermCandidate(
-                term=item.term,
-                lemma=item.lemma,
-                surface_forms=item.surface_forms,
-                category=item.category,
+                term=term,
+                lemma=lemma,
+                surface_forms=_surface_forms(item.surface_forms, term),
+                category=_category(item.category),
                 cue_ids=segment.cue_ids,
                 context_sentence=context,
-                section_id=section_id,
-                why_it_matters=item.why_it_matters,
-                confidence=item.confidence,
+                section_id=_section_for(segment.start_ms, section_spans),
+                why_it_matters=why_it_matters,
+                confidence=_confidence(item.confidence),
             )
         )
 
     return candidates
+
+
+def _text(value: object) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _surface_forms(value: list[str] | None, term: str) -> list[str]:
+    forms = [form.strip() for form in value or [] if isinstance(form, str) and form.strip()]
+    return forms or [term]
+
+
+def _category(value: str | None) -> TermCategory:
+    try:
+        return TermCategory(_text(value).casefold())
+    except ValueError:
+        return TermCategory.COMMON_ADVANCED
+
+
+def _confidence(value: object) -> float:
+    if isinstance(value, str):
+        try:
+            value = float(value)
+        except ValueError:
+            return 0.5
+    if not isinstance(value, (int, float)) or math.isnan(value):
+        return 0.5
+    return min(max(float(value), 0.0), 1.0)
 
 
 def _section_for(start_ms: int, spans: list[tuple[str, int, int]]) -> str:
@@ -125,15 +193,38 @@ def _section_for(start_ms: int, spans: list[tuple[str, int, int]]) -> str:
     return spans[0][0] if spans else "sec-01"
 
 
+SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?…])\s+")
+
+
 def _context_in_segment(sentence: str, term: str, segment_text: str) -> str:
-    cleaned = sentence.strip()
-    if cleaned and cleaned in segment_text:
-        return cleaned[:300]
-    match = re.search(
-        rf"[^.!?]*\b{re.escape(term)}\b[^.!?]*[.!?]?",
-        segment_text,
-        flags=re.IGNORECASE,
-    )
-    if match:
-        return match.group(0).strip()[:300]
-    return segment_text.strip()[:300]
+    """Return a quote that exists in the segment and is usable as context.
+
+    The model sometimes emits a fragment such as ``"Zosimus."``. Rather than
+    rejecting the term, expand the fragment to the sentence (and, if needed,
+    neighbouring sentences) that contains it.
+    """
+
+    cleaned = " ".join(sentence.split())[:300]
+    if len(cleaned) >= 10 and cleaned in segment_text:
+        return cleaned
+
+    sentences = [
+        part.strip() for part in SENTENCE_SPLIT_RE.split(segment_text.strip()) if part.strip()
+    ]
+    pattern = re.compile(rf"\b{re.escape(term)}\b", re.IGNORECASE)
+    for index, candidate in enumerate(sentences):
+        if not pattern.search(candidate):
+            continue
+        start = end = index
+        context = candidate
+        while len(context) < 10 and (start > 0 or end < len(sentences) - 1):
+            if start > 0:
+                start -= 1
+                context = f"{sentences[start]} {context}"
+            if len(context) < 10 and end < len(sentences) - 1:
+                end += 1
+                context = f"{context} {sentences[end]}"
+        return context[:300]
+
+    fallback = " ".join(segment_text.split())[:300]
+    return fallback if len(fallback) >= 10 else ""

@@ -11,7 +11,7 @@ from langchain_deepseek import ChatDeepSeek
 from pydantic import AliasChoices, BaseModel, Field, ValidationError
 
 from situlearn.knowledge import NarrativeScript, TermCandidate
-from situlearn.llm import structured_output
+from situlearn.llm import invoke_with_retry, structured_output
 from situlearn.models import Segment
 from situlearn.planning import (
     ExtractedTerms,
@@ -78,11 +78,12 @@ def plan_narrative(llm: ChatDeepSeek, segments: list[Segment]) -> NarrativeScrip
         [("system", NARRATIVE_SYSTEM), ("user", NARRATIVE_USER)]
     )
     chain = prompt | structured_output(llm, PlannedNarrative)
-    planned = chain.invoke(
+    planned = invoke_with_retry(
+        chain,
         {
             "transcript": format_transcript(segments),
             "duration_min": duration_min,
-        }
+        },
     )
     return to_narrative_script(planned, segments)
 
@@ -164,10 +165,16 @@ def extract_terms(
         [("system", VOCAB_SYSTEM), ("user", VOCAB_USER)]
     )
     chain = prompt | structured_output(llm, ExtractedTerms)
-    extracted = chain.invoke(
-        {
-            "narrative_context": _format_narrative_context(script),
-            "transcript": format_transcript(segments),
-        }
-    )
-    return to_term_candidates(extracted, segments, script)
+    payload = {
+        "narrative_context": _format_narrative_context(script),
+        "transcript": format_transcript(segments),
+    }
+    candidates: list[TermCandidate] = []
+    for _ in range(2):
+        extracted = invoke_with_retry(chain, payload)
+        candidates = to_term_candidates(extracted, segments, script)
+        if candidates:
+            break
+    if not candidates:
+        raise RuntimeError("术语提取没有返回可用词条，请重试或检查提示词")
+    return candidates

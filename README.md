@@ -20,7 +20,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Install the released CLI:
 
 ```bash
-uv tool install --python 3.12 https://github.com/dream-365/SituationalLearning/releases/download/v0.1.1/situlearn-0.1.1-py3-none-any.whl
+uv tool install --python 3.12 https://github.com/dream-365/SituationalLearning/releases/download/v0.1.2/situlearn-0.1.2-py3-none-any.whl
 ```
 
 If PyPI is slow, set `HTTPS_PROXY` to your local proxy before installing.

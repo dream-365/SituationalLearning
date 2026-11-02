@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
-from typing import TypeVar
+import time
+from typing import Any, TypeVar
 
+from langchain_core.exceptions import OutputParserException
 from langchain_core.runnables import Runnable
 from langchain_deepseek import ChatDeepSeek
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 DEFAULT_MODEL = "deepseek-flash"
 DEFAULT_BASE_URL = "https://api.deepseek.com/v1"
@@ -45,3 +47,23 @@ def structured_output(llm: ChatDeepSeek, schema: type[T]) -> Runnable:
     """
 
     return llm.with_structured_output(schema, method="json_mode")
+
+
+def invoke_with_retry(
+    chain: Runnable, payload: dict[str, Any], *, attempts: int = 3
+) -> Any:
+    """Invoke a structured-output chain, retrying malformed model output.
+
+    A truncated or off-schema JSON response should cost one retry, not the
+    whole build.
+    """
+
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return chain.invoke(payload)
+        except (OutputParserException, ValidationError) as exc:
+            last_error = exc
+            if attempt < attempts:
+                time.sleep(min(2.0 * attempt, 10.0))
+    raise last_error  # type: ignore[misc]

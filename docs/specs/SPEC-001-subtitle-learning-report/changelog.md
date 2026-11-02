@@ -8,6 +8,13 @@ updated_at: 2026-11-02
 
 # Changelog: SPEC-001 情景学习
 
+## [2026-11-02] - LLM 输出逐条容错
+
+- **修改类型**: Fixed
+- **影响范围**: 4.3 `TermCandidate`；3.2 Narrative Planner / Vocabulary Extractor / Gloss Generator；5.2 可靠性；6.1 发布
+- **变更原因**: 术语提取时模型返回的 `context_sentence` 为 `Zosimus.`（8 字符），触发整批 `ExtractedTerms` 校验失败，构建在已花费 200 秒 LLM 调用后直接终止
+- **具体内容**: LLM 传输模型与 `TermCandidate` / `TermEntry` 规范模型分离，传输模型放宽长度、类型与可空约束；过短上下文自动扩展为所在完整句，未知 category、越界 confidence、缺失字段按规则归一；单条词条或释义不可用时只丢弃该条，其余继续；结构化输出解析失败自动重试最多 3 次；术语批次规范化后为空时再抽取一次；narrative / terms / dictionary / gloss 缓存损坏时视为未命中并重建；叙事映射中模型编造的 `segment_id` 被过滤而非报错。
+
 ## [2026-11-02] - 缓存移入用户目录并输出构建进度
 
 - **修改类型**: Changed

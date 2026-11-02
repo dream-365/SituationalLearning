@@ -72,6 +72,15 @@ def _package_version(name: str) -> str:
         return "unknown"
 
 
+def _read_json(path: Path) -> object | None:
+    """Read a JSON cache file, returning None when it is missing or corrupt."""
+
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
 def _load_or_create_narrative(
     llm,
     segments,
@@ -79,9 +88,13 @@ def _load_or_create_narrative(
     *,
     force: bool,
 ) -> NarrativeScript:
+    script = None
     if cache_path.exists() and not force:
-        script = NarrativeScript.model_validate_json(cache_path.read_text(encoding="utf-8"))
-    else:
+        try:
+            script = NarrativeScript.model_validate_json(cache_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            script = None
+    if script is None:
         script = plan_narrative(llm, segments)
 
     repaired = repair_narrative_chinese(llm, script)
@@ -99,8 +112,12 @@ def _load_or_create_terms(
     force: bool,
 ) -> list[TermCandidate]:
     if cache_path.exists() and not force:
-        payload = json.loads(cache_path.read_text(encoding="utf-8"))
-        return [TermCandidate.model_validate(item) for item in payload]
+        payload = _read_json(cache_path)
+        if isinstance(payload, list):
+            try:
+                return [TermCandidate.model_validate(item) for item in payload]
+            except (TypeError, ValueError):
+                pass
     terms = extract_terms(llm, segments, script)
     cache_path.write_text(
         json.dumps([term.model_dump(mode="json") for term in terms], ensure_ascii=False, indent=2),
@@ -129,8 +146,15 @@ def _load_or_create_dictionary(
     force: bool,
 ) -> dict[str, DictionaryEntry]:
     if cache_path.exists() and not force:
-        payload = json.loads(cache_path.read_text(encoding="utf-8"))
-        return {key: DictionaryEntry.model_validate(value) for key, value in payload.items()}
+        payload = _read_json(cache_path)
+        if isinstance(payload, dict):
+            try:
+                return {
+                    key: DictionaryEntry.model_validate(value)
+                    for key, value in payload.items()
+                }
+            except (TypeError, ValueError):
+                pass
     mapping = _lookup_dictionary(candidates)
     cache_path.write_text(
         json.dumps(
@@ -145,8 +169,12 @@ def _load_or_create_dictionary(
 
 def _load_or_create_gloss(llm, candidates, dictionary, cache_path: Path, *, force: bool) -> list[TermEntry]:
     if cache_path.exists() and not force:
-        payload = json.loads(cache_path.read_text(encoding="utf-8"))
-        return [TermEntry.model_validate(item) for item in payload]
+        payload = _read_json(cache_path)
+        if isinstance(payload, list):
+            try:
+                return [TermEntry.model_validate(item) for item in payload]
+            except (TypeError, ValueError):
+                pass
     terms = gloss_terms(llm, candidates, dictionary)
     cache_path.write_text(
         json.dumps(
