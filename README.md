@@ -9,25 +9,48 @@ Working end-to-end on a 60-minute documentary sample: 8 Chinese narrative chapte
 Spec: `docs/specs/SPEC-001-subtitle-learning-report/spec.md` (Approved)
 Plan: `docs/specs/SPEC-001-subtitle-learning-report/plan.md` (Approved)
 
-## Setup
+## Install
+
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/). Install uv first if needed:
 
 ```bash
-uv sync --frozen
-cp your-documentary.en.srt samples/
-uv run situlearn build samples/your-documentary.en.srt --out reports/your-documentary
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-If PyPI is slow, export your local proxy before syncing:
+Install the released CLI:
 
 ```bash
-HTTPS_PROXY=http://127.0.0.1:1087 uv sync --frozen
+uv tool install --python 3.12 https://github.com/dream-365/SituationalLearning/releases/download/v0.1.0/situlearn-0.1.0-py3-none-any.whl
 ```
+
+If PyPI is slow, set `HTTPS_PROXY` to your local proxy before installing.
 
 ## Environment
 
 - `DEEPSEEK_API_KEY`
 - `MIMO_API_KEY`
 - Optional: `DEEPSEEK_BASE_URL`, `MIMO_BASE_URL`
+
+## Usage
+
+```bash
+export DEEPSEEK_API_KEY=...
+export MIMO_API_KEY=...
+situlearn build your-documentary.en.srt --out reports/your-documentary
+open reports/your-documentary/report.html
+```
+
+The build writes `report.html`, `manifest.json`, and `assets/audio/` into the output directory. The generated report is fully offline.
+
+## Run from source
+
+```bash
+git clone https://github.com/dream-365/SituationalLearning.git
+cd SituationalLearning
+uv sync --frozen
+cp your-documentary.en.srt samples/
+uv run situlearn build samples/your-documentary.en.srt --out reports/your-documentary
+```
 
 ## Development
 
