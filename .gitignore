@@ -11,3 +11,6 @@ samples/*.srt
 .DS_Store
 *.mp3
 *.wav
+
+dist/
+build/
