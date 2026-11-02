@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: situlearn-backup
+  labels:
+    app.kubernetes.io/name: situlearn
+spec:
+  schedule: "17 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: busybox:1.36
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - >-
+                  tar -czf /backup/situlearn-$(date +%Y%m%d).tar.gz -C /data .
+                  && find /backup -type f -mtime +7 -delete
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: situlearn-data
+            - name: backup
+              persistentVolumeClaim:
+                claimName: situlearn-backup

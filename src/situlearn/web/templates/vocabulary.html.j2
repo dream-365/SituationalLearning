@@ -1,0 +1,76 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<section class="vocabulary">
+  <div class="section-head">
+    <h1>词表</h1>
+    <p class="meta">{{ terms | length }} 个词条</p>
+  </div>
+
+  <form class="filters" method="get" action="/r/{{ report.slug }}/vocabulary">
+    <label>
+      <span>章节</span>
+      <select name="section">
+        <option value="">全部章节</option>
+        {% for section in sections %}
+        <option value="{{ section.section_id }}"{% if section.section_id == selected_section %} selected{% endif %}>{{ section.heading }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>分类</span>
+      <select name="category">
+        <option value="">全部分类</option>
+        {% for value, label in categories %}
+        <option value="{{ value }}"{% if value == selected_category %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="search">
+      <span>搜索</span>
+      <input type="search" name="q" value="{{ query }}" placeholder="词、释义或原句">
+    </label>
+    <button type="submit">筛选</button>
+  </form>
+
+  <div class="term-list">
+    {% for term in terms %}
+    <article
+      class="term"
+      data-section="{{ term.section_id }}"
+      data-category="{{ term.category }}"
+      data-text="{{ (term.term ~ ' ' ~ term.definition_zh ~ ' ' ~ term.context_sentence) | lower }}"
+    >
+      <div class="term-head">
+        <h2>{{ term.term }}</h2>
+        {% if term.ipa %}<span class="ipa">{{ term.ipa }}</span>{% endif %}
+        <span class="pos">{{ term.part_of_speech }}</span>
+        <span class="badge">{{ term.category_label }}</span>
+      </div>
+      <p class="definition"><strong>中文</strong> {{ term.definition_zh }}</p>
+      <p class="definition"><strong>English</strong> {{ term.definition_en }}</p>
+      <p class="context">{{ term.context_sentence }}</p>
+      <p class="why">{{ term.why_it_matters }}</p>
+      {% if term.pronunciation_note %}<p class="note">{{ term.pronunciation_note }}</p>{% endif %}
+      <div class="term-actions">
+        <span class="section-label">{{ term.section_heading }}</span>
+        <button
+          class="term-play"
+          type="button"
+          data-src="{{ term.audio_ref }}"
+          data-label="{{ term.term }}"
+          aria-label="播放 {{ term.term }} 的发音"
+          {% if not term.audio_available %}disabled{% endif %}
+        >🔊</button>
+      </div>
+    </article>
+    {% else %}
+    <p class="empty">没有符合条件的词条。</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/filters.js" defer></script>
+{% endblock %}

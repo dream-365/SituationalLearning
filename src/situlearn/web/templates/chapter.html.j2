@@ -1,0 +1,34 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<nav class="breadcrumb" aria-label="面包屑">
+  <a href="/r/{{ report.slug }}">← 返回报告</a>
+</nav>
+
+<article class="chapter-detail" data-section-id="{{ section.section_id }}">
+  <p class="eyebrow">章节</p>
+  <h1>{{ section.heading }}</h1>
+  <p class="chapter-time">{{ section.start }}–{{ section.end }}</p>
+
+  <button
+    class="play"
+    type="button"
+    data-srcs='{{ section.audio_refs | tojson }}'
+    data-label="{{ section.heading }}"
+    data-section-id="{{ section.section_id }}"
+    {% if not section.audio_available %}disabled{% endif %}
+  >{% if section.audio_available %}播放本节{% else %}暂无音频{% endif %}</button>
+
+  <p class="summary">{{ section.summary }}</p>
+  <div class="spoken-text">{{ section.spoken_text }}</div>
+
+  {% if section.key_terms %}
+  <section class="key-terms" aria-labelledby="key-terms-heading">
+    <h2 id="key-terms-heading">本节关键词</h2>
+    <ul>
+      {% for term in section.key_terms %}<li>{{ term }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</article>
+{% endblock %}

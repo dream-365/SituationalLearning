@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: situlearn
+  labels:
+    app.kubernetes.io/name: situlearn
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: situlearn
+  template:
+    metadata:
+      labels:
+        app: situlearn
+        app.kubernetes.io/name: situlearn
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: web
+          image: situlearn-web:0.2.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: situlearn-config
+          env:
+            - name: PUBLISH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: situlearn-secrets
+                  key: PUBLISH_TOKEN
+            - name: SITULEARN_DATA_DIR
+              value: /data
+            - name: SITULEARN_BACKUP_DIR
+              value: /backup
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: backup
+              mountPath: /backup
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: situlearn-data
+        - name: backup
+          persistentVolumeClaim:
+            claimName: situlearn-backup
+        - name: tmp
+          emptyDir: {}
