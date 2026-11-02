@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; media-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>{{ title }} · 情景学习</title>
+<style>
+  :root {
+    --bg: #f7f4ee;
+    --paper: #fffdf9;
+    --ink: #211f1b;
+    --muted: #6d675d;
+    --line: #ddd5c8;
+    --accent: #8a3b2f;
+    --accent-soft: #f0e3dc;
+    --gold: #b08a3e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
+    line-height: 1.7;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px 72px; }
+  header.hero {
+    padding: 64px 0 40px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 40px;
+  }
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1, h2, h3 { font-family: Georgia, "Songti SC", "Noto Serif SC", serif; font-weight: 600; }
+  h1 { font-size: clamp(30px, 4.5vw, 52px); line-height: 1.15; margin: 0 0 16px; }
+  .logline { font-size: 18px; color: var(--muted); max-width: 720px; margin: 0 0 20px; }
+  .meta { font-size: 13px; color: var(--muted); }
+  .hero-controls { margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap; }
+  button {
+    font: inherit;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    border-radius: 999px;
+    padding: 8px 18px;
+    cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  h2 { font-size: 26px; margin: 0 0 8px; }
+  .section-lead { color: var(--muted); margin: 0 0 28px; }
+  .background {
+    background: var(--paper);
+    border-left: 3px solid var(--gold);
+    padding: 20px 24px;
+    margin: 0 0 32px;
+    font-size: 16px;
+  }
+  .timeline { list-style: none; margin: 0; padding: 0; }
+  .chapter {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin-bottom: 16px;
+    scroll-margin-top: 24px;
+  }
+  .chapter-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .chapter-head h3 { margin: 0; font-size: 20px; }
+  .time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .chapter-head .play { margin-left: auto; padding: 6px 14px; font-size: 13px; }
+  .summary { margin: 12px 0 10px; }
+  details { margin: 8px 0 0; }
+  summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+  .spoken { color: var(--muted); font-size: 15px; white-space: pre-wrap; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .chip {
+    font-size: 12px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+  .filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 0 20px;
+  }
+  select, input[type="search"] {
+    font: inherit;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  input[type="search"] { min-width: 220px; flex: 1; }
+  .terms { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .term {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .term-head { display: flex; align-items: center; gap: 10px; }
+  .term-head h3 { margin: 0; font-size: 21px; }
+  .term-play { margin-left: auto; padding: 4px 10px; font-size: 14px; }
+  .pron { font-size: 13px; color: var(--muted); }
+  .pos { font-size: 12px; color: var(--gold); text-transform: uppercase; letter-spacing: .08em; }
+  .def-zh { margin: 4px 0 0; }
+  .def-en { margin: 0; color: var(--muted); font-size: 14px; }
+  blockquote {
+    margin: 6px 0 0;
+    padding: 10px 12px;
+    background: #f3eee5;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #4a453d;
+  }
+  .why { font-size: 13px; color: var(--muted); margin: 0; }
+  .term-meta { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 8px; }
+  .badge { font-size: 11px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--muted); }
+  .term-meta a { margin-left: auto; font-size: 12px; color: var(--accent); text-decoration: none; }
+  .empty { color: var(--muted); padding: 24px 0; }
+  footer { border-top: 1px solid var(--line); margin-top: 48px; padding-top: 20px; font-size: 12px; color: var(--muted); }
+  footer a { color: var(--accent); }
+  .player {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    background: rgba(255, 253, 249, .97);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 24px rgba(33, 31, 27, .08);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+  .player-inner {
+    max-width: 980px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .player-toggle {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    flex: 0 0 auto;
+  }
+  .player-main { flex: 1; min-width: 0; }
+  .player-label {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+  .player-seek {
+    width: 100%;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--accent);
+  }
+  .player-time {
+    flex: 0 0 auto;
+    min-width: 96px;
+    text-align: right;
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  body.has-player { padding-bottom: 88px; }
+  @media (max-width: 600px) {
+    .wrap { padding: 0 16px 48px; }
+    header.hero { padding-top: 40px; }
+    .chapter { padding: 18px; }
+    .player-time { min-width: 78px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">情景学习 · 字幕学习报告</p>
+    <h1>{{ title }}</h1>
+    <p class="logline">{{ logline }}</p>
+    <p class="meta">片长 {{ duration_min }} 分钟 · {{ cue_count }} 条字幕 · 生成于 {{ generated_at }}</p>
+    <div class="hero-controls">
+      <button id="play-all" type="button">播放全部脉络</button>
+      <button id="stop-all" class="ghost" type="button">停止</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="narrative">
+      <h2>内容脉络</h2>
+      <p class="section-lead">先听一遍片子怎么走，再回头对着下面的生词本看。</p>
+      <div class="background">{{ background }}</div>
+      <ol class="timeline">
+        {% for s in sections %}
+        <li class="chapter" id="{{ s.section_id }}">
+          <div class="chapter-head">
+            <span class="time">{{ s.start }} – {{ s.end }}</span>
+            <h3>{{ s.heading }}</h3>
+            <button class="play" type="button" data-srcs='{{ s.audio_refs | tojson }}' data-label="{{ s.heading }}" {% if not s.audio_refs %}disabled{% endif %}>
+              {% if s.audio_refs %}播放本节{% else %}暂无音频{% endif %}
+            </button>
+          </div>
+          <p class="summary">{{ s.summary }}</p>
+          <details>
+            <summary>展开播报稿</summary>
+            <p class="spoken">{{ s.spoken_text }}</p>
+          </details>
+          {% if s.key_terms %}
+          <div class="chips">
+            {% for term in s.key_terms %}<span class="chip">{{ term }}</span>{% endfor %}
+          </div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+
+    <section id="vocab" style="margin-top:48px">
+      <h2>生词本</h2>
+      <p class="section-lead">专业术语和专名优先，也可以按章节筛选，回到它出现的语境。</p>
+      <div class="filters">
+        <select id="filter-section">
+          <option value="">全部章节</option>
+          {% for s in sections %}<option value="{{ s.section_id }}">{{ s.heading }}</option>{% endfor %}
+        </select>
+        <select id="filter-category">
+          <option value="">全部分类</option>
+          <option value="domain_term">领域术语</option>
+          <option value="proper_noun">专名</option>
+          <option value="work_title">作品名</option>
+          <option value="school_genre">流派/时期</option>
+          <option value="common_advanced">低频普通词</option>
+        </select>
+        <input id="search" type="search" placeholder="搜索单词、释义或原句">
+      </div>
+      <div class="terms" id="terms">
+        {% for t in terms %}
+        <article class="term" data-section="{{ t.section_id }}" data-category="{{ t.category }}" data-text="{{ (t.term ~ ' ' ~ t.definition_zh ~ ' ' ~ t.context_sentence) | lower }}">
+          <div class="term-head">
+            <h3>{{ t.term }}</h3>
+            <button class="term-play" type="button" data-src="{{ t.audio_ref }}" data-label="{{ t.term }}" {% if t.audio_ref == 'unavailable' %}disabled{% endif %} aria-label="播放 {{ t.term }} 的发音">🔊</button>
+          </div>
+          <div class="pron">{{ t.ipa or t.pronunciation_note or '' }}</div>
+          <div class="pos">{{ t.part_of_speech }}</div>
+          <p class="def-zh">{{ t.definition_zh }}</p>
+          <p class="def-en">{{ t.definition_en }}</p>
+          <blockquote>{{ t.context_sentence }}</blockquote>
+          <p class="why">{{ t.why_it_matters }}</p>
+          <div class="term-meta">
+            <span class="badge">{{ t.category_label }}</span>
+            <a href="#{{ t.section_id }}">回到本节</a>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      <p class="empty" id="empty" hidden>没有匹配的词条。</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>发音来源：Oxford Learner's Dictionaries、Youdao Dictionary、Wiktionary（可用时）与小米 MiMo TTS。报告仅用于个人学习。</p>
+    <p>字幕文件：{{ source_filename }}</p>
+  </footer>
+</div>
+
+<div class="player" id="player" hidden>
+  <div class="player-inner">
+    <button class="player-toggle" id="player-toggle" type="button" aria-label="播放或暂停">▶</button>
+    <div class="player-main">
+      <div class="player-label" id="player-label">未播放</div>
+      <input class="player-seek" id="player-seek" type="range" min="0" max="100" value="0" step="0.1" aria-label="播放进度">
+    </div>
+    <div class="player-time" id="player-time">00:00 / 00:00</div>
+  </div>
+</div>
+
+<script>
+  const player = document.getElementById('player');
+  const playerToggle = document.getElementById('player-toggle');
+  const playerLabel = document.getElementById('player-label');
+  const playerSeek = document.getElementById('player-seek');
+  const playerTime = document.getElementById('player-time');
+  const audio = new Audio();
+  let playlist = [];
+  let index = 0;
+
+  function formatTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
+    const total = Math.floor(seconds);
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  }
+
+  function updatePlayer() {
+    const current = audio.currentTime || 0;
+    const duration = audio.duration || 0;
+    playerSeek.value = duration ? (current / duration) * 100 : 0;
+    playerTime.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
+    const currentLabel = playlist[index] ? playlist[index].label : '未播放';
+    const part = playlist.length > 1 ? ` · ${index + 1}/${playlist.length}` : '';
+    const remaining = duration ? formatTime(Math.max(0, duration - current)) : '00:00';
+    playerLabel.textContent = `${currentLabel}${part} · 剩余 ${remaining}`;
+  }
+
+  function loadTrack() {
+    if (!playlist[index]) return false;
+    audio.src = playlist[index].src;
+    audio.load();
+    return true;
+  }
+
+  function playPlaylist(items) {
+    playlist = items.filter((item) => item && item.src);
+    index = 0;
+    if (!playlist.length) return;
+    player.hidden = false;
+    document.body.classList.add('has-player');
+    loadTrack();
+    audio.play().catch(() => {});
+  }
+
+  audio.addEventListener('loadedmetadata', updatePlayer);
+  audio.addEventListener('timeupdate', updatePlayer);
+  audio.addEventListener('ended', () => {
+    index += 1;
+    if (index < playlist.length) {
+      loadTrack();
+      audio.play().catch(() => {});
+    } else {
+      playerToggle.textContent = '▶';
+    }
+  });
+  audio.addEventListener('play', () => { playerToggle.textContent = '⏸'; });
+  audio.addEventListener('pause', () => { playerToggle.textContent = '▶'; });
+
+  playerToggle.addEventListener('click', () => {
+    if (!playlist.length) return;
+    if (audio.paused) audio.play().catch(() => {});
+    else audio.pause();
+  });
+
+  playerSeek.addEventListener('input', () => {
+    if (audio.duration) audio.currentTime = (Number(playerSeek.value) / 100) * audio.duration;
+  });
+
+  function sectionItems(button) {
+    const srcs = JSON.parse(button.dataset.srcs || '[]');
+    const label = button.dataset.label || '本节';
+    return srcs.map((src) => ({ src, label }));
+  }
+
+  document.querySelectorAll('.play').forEach((button) => {
+    button.addEventListener('click', () => {
+      const items = sectionItems(button);
+      if (items.length) playPlaylist(items);
+    });
+  });
+
+  document.querySelectorAll('.term-play').forEach((button) => {
+    button.addEventListener('click', () => {
+      const src = button.dataset.src;
+      if (!src || src === 'unavailable') return;
+      playPlaylist([{ src, label: button.dataset.label || '词条' }]);
+    });
+  });
+
+  document.getElementById('stop-all').addEventListener('click', () => {
+    audio.pause();
+    audio.currentTime = 0;
+    updatePlayer();
+  });
+
+  document.getElementById('play-all').addEventListener('click', () => {
+    const items = [];
+    document.querySelectorAll('.play').forEach((button) => {
+      items.push(...sectionItems(button));
+    });
+    if (items.length) playPlaylist(items);
+  });
+
+  const sectionFilter = document.getElementById('filter-section');
+  const categoryFilter = document.getElementById('filter-category');
+  const search = document.getElementById('search');
+  const terms = Array.from(document.querySelectorAll('.term'));
+  const empty = document.getElementById('empty');
+
+  function applyFilters() {
+    const section = sectionFilter.value;
+    const category = categoryFilter.value;
+    const query = search.value.trim().toLowerCase();
+    let visible = 0;
+    terms.forEach((term) => {
+      const matchesSection = !section || term.dataset.section === section;
+      const matchesCategory = !category || term.dataset.category === category;
+      const matchesQuery = !query || (term.dataset.text || '').includes(query);
+      const show = matchesSection && matchesCategory && matchesQuery;
+      term.hidden = !show;
+      if (show) visible += 1;
+    });
+    empty.hidden = visible !== 0;
+  }
+
+  sectionFilter.addEventListener('change', applyFilters);
+  categoryFilter.addEventListener('change', applyFilters);
+  search.addEventListener('input', applyFilters);
+</script>
+</body>
+</html>

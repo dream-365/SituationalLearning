@@ -1,0 +1,279 @@
+# Spec Quality Report
+
+- Target: `docs/specs/SPEC-001-subtitle-learning-report/spec.md`
+- Rubric: 1.0.0 (`acb806c85c7a357f1cdfeaea80a8dc951333aefe5b630fe8576e0e0ce7f25947`)
+- Target SHA-256: `68a70cb2d8dacc962bc0be162a1bbe7b11b969f52162d90391a543efeef10653`
+- Reviewer session: `review-SPEC-001-20261102`
+
+**Headline score (core): 100.0**  |  Diagnostic score (all): 100.0
+
+> The auditor verifies evidence presence, section placement, and score arithmetic. It does not judge whether evidence is sufficient or true.
+
+> Normalization covers full-width ASCII, NBSP, and ideographic space; it is not full Unicode NFKC.
+
+| Dimension | Headline | Diagnostic | Weight |
+|---|---:|---:|---:|
+| 背景落地 | 100.0 | 100.0 | 2 |
+| 痛点证据 | 100.0 | 100.0 | 3 |
+| 目标可验收 | 100.0 | 100.0 | 3 |
+| 非目标边界 | 100.0 | 100.0 | 2 |
+| 架构自洽 | 100.0 | 100.0 | 2 |
+| 详细设计完整 | 100.0 | 100.0 | 2 |
+| NFR 可度量 | 100.0 | 100.0 | 2 |
+| 上线可回滚 | 100.0 | 100.0 | 2 |
+| 替代方案诚实 | 100.0 | 100.0 | 2 |
+| 跨章自洽 | 100.0 | 100.0 | 2 |
+| 证据卫生 | 100.0 | 100.0 | 3 |
+
+## 背景落地 (background)
+
+- **bg.current_state** [core, level 2] — 1.1 是否写清了模块职责、核心流程与当前技术栈？
+  - evidence `1.1 系统现状`: "当前没有已实现的代码模块，也没有运行中的服务。看纪录片学英语的流程完全人工，按下面的路径走："
+  - normalized: "当前没有已实现的代码模块,也没有运行中的服务。看纪录片学英语的流程完全人工,按下面的路径走:"
+  - evidence `1.1 系统现状`: "技术栈现状为零：没有字幕解析、没有词典查询、没有语音生成、没有学习材料渲染。本方案是新建能力，不改造任何现有模块。"
+  - normalized: "技术栈现状为零:没有字幕解析、没有词典查询、没有语音生成、没有学习材料渲染。本方案是新建能力,不改造任何现有模块。"
+  - rationale: 1.1 用四步流程写清现状与数据流，并明确当前无模块、技术栈为零；greenfield 下无既有模块职责，但职责边界已说明。
+- **bg.failure_chain** [core, level 2] — 1.2 是否有从触发到后果的分步失败链？
+  - evidence `1.2 核心技术痛点`: "1. **当场放弃，理解断裂**：听到生词 → 想查 → 暂停打断观影节奏 → 决定不查 → 靠上下文猜 → 术语所在的那段论证接不上 → 整部片子只理解到「大概」。"
+  - normalized: "1. **当场放弃,理解断裂**:听到生词 → 想查 → 暂停打断观影节奏 → 决定不查 → 靠上下文猜 → 术语所在的那段论证接不上 → 整部片子只理解到「大概」。"
+  - rationale: 1.2 用四个编号断点给出从触发到后果的失败链，第一条即展示「听到生词→暂停→放弃→论证断裂」的完整因果。
+- **bg.trigger** [core, level 2] — 1.3 是否解释了为什么现在做？
+  - evidence `1.3 重构/设计动机`: "三个触发点在同一时间成立，所以现在做："
+  - normalized: "三个触发点在同一时间成立,所以现在做:"
+  - rationale: 1.3 列出使用、素材、能力三个触发点并解释它们同时成立，直接回答为什么现在做。
+- **bg.non_goals** [core, level 2] — 1.4 是否写了不做的后果与本次非目标？
+  - evidence `1.4 非目标`: "不做这件事的后果已经在 1.2 写明：理解停在「大概」、反复查反复忘、能力无法积累。本次明确不做："
+  - normalized: "不做这件事的后果已经在 1.2 写明:理解停在「大概」、反复查反复忘、能力无法积累。本次明确不做:"
+  - evidence `1.4 非目标`: "- LangGraph、LangServe 与自建 agent 循环（本次不做；只使用 LangChain 核心 Chain/Runnable 与 'langchain-deepseek'）；LangSmith 只作为本地调试的可选开关，不作为运行依赖。"
+  - normalized: "- LangGraph、LangServe 与自建 agent 循环(本次不做;只使用 LangChain 核心 Chain/Runnable 与 'langchain-deepseek');LangSmith 只作为本地调试的可选开关,不作为运行依赖。"
+  - rationale: 1.4 先写明不做的后果，再列出八类非目标（含公开分发与 LangGraph/LangServe 边界），两项要求都覆盖。
+
+## 痛点证据 (pain_evidence)
+
+- **bg.pain_evidence** [core, level 2] — 1.2 是否有至少一条可核实的证据（事故、度量或引述）？
+  - evidence `1.2 核心技术痛点`: "证据（引述）：用户描述触发场景时说：「我最近在看一部纪录片叫做文艺复兴的解放，这中间有很多专业的词汇我都不认识，包括很多的艺术家，他的背景我也想要了解」。用户进一步给出的具体词例是 'Renaissance'（文艺复兴，领域术语）、'cherub'（小天使，艺术史专名）与 'wheedled'（哄骗，低频普通动词）。"
+  - normalized: "证据(引述):用户描述触发场景时说:「我最近在看一部纪录片叫做文艺复兴的解放,这中间有很多专业的词汇我都不认识,包括很多的艺术家,他的背景我也想要了解」。用户进一步给出的具体词例是 'Renaissance'(文艺复兴,领域术语)、'cherub'(小天使,艺术史专名)与 'wheedled'(哄骗,低频普通动词)。"
+  - evidence `1.2 核心技术痛点`: "实际字幕样本已验证：1,186 条 cue、59.7 分钟、UTF-8 不带 BOM、62 条多行 cue、没有 HTML 标签与说话人标记；大量 cue 在句子中间切断（首条以 'in' 结尾，下一条以 'Florence' 开头），因此解析后必须先做句子级合并。"
+  - normalized: "实际字幕样本已验证:1,186 条 cue、59.7 分钟、UTF-8 不带 BOM、62 条多行 cue、没有 HTML 标签与说话人标记;大量 cue 在句子中间切断(首条以 'in' 结尾,下一条以 'Florence' 开头),因此解析后必须先做句子级合并。"
+  - rationale: 1.2 给出带来源的用户引述与三个具体词例，并用真实 srt 的 1,186 条 cue、59.7 分钟等实测数据补强证据，直接对应失败链。
+
+## 目标可验收 (goal_verifiability)
+
+- **goal.verifiable** [core, level 2] — 2.1 每个 Goal 是否都有验收方式？
+  - evidence `2.1 目标`: "- **G1 - 端到端可运行（工程）**：输入一份 45–60 分钟英文纪录片 '.srt'（约 500–900 条 cue），一条命令生成离线可打开的 HTML 报告。验收：用《文艺复兴的解放》真实字幕跑通，'report.html' 双击可打开；断网后脉络文字、词表与已下载音频仍可使用。"
+  - normalized: "- **G1 - 端到端可运行(工程)**:输入一份 45–60 分钟英文纪录片 '.srt'(约 500–900 条 cue),一条命令生成离线可打开的 HTML 报告。验收:用《文艺复兴的解放》真实字幕跑通,'report.html' 双击可打开;断网后脉络文字、词表与已下载音频仍可使用。"
+  - evidence `2.1 目标`: "- **G2 - 脉络可播报（质量）**：报告包含「是什么 / 背景 / 按什么顺序展开」的叙事线，拆成 4–8 个章节，每章有全中文口语播报稿（英文术语用通行中文译名或简短解释，不夹带英文原词）与音频；全文朗读时长落在 6–15 分钟。验收：独立评审按 5 项检查打分（开场定位、背景交代、推进顺序、口语化程度、章节收束），至少 4 项通过；音频总时长实测落在区间内。"
+  - normalized: "- **G2 - 脉络可播报(质量)**:报告包含「是什么 / 背景 / 按什么顺序展开」的叙事线,拆成 4–8 个章节,每章有全中文口语播报稿(英文术语用通行中文译名或简短解释,不夹带英文原词)与音频;全文朗读时长落在 6–15 分钟。验收:独立评审按 5 项检查打分(开场定位、背景交代、推进顺序、口语化程度、章节收束),至少 4 项通过;音频总时长实测落在区间内。"
+  - evidence `2.1 目标`: "- **G4 - 语音可用（可靠性）**：每个脉络章节都有音频；≥ 95% 的词条有真人音频（Oxford Learner's Dictionaries / Youdao Dictionary），其余词条明确标注 TTS；全部音频在断网状态可播放。验收：统计 'manifest.json' 中 'audio_source=dictionary' 的词条占比 ≥95%；每个 TTS 词条有可见的发音说明；音频清单与 HTML 引用一一对应；断网手测播放。"
+  - normalized: "- **G4 - 语音可用(可靠性)**:每个脉络章节都有音频;≥ 95% 的词条有真人音频(Oxford Learner's Dictionaries / Youdao Dictionary),其余词条明确标注 TTS;全部音频在断网状态可播放。验收:统计 'manifest.json' 中 'audio_source=dictionary' 的词条占比 ≥95%;每个 TTS 词条有可见的发音说明;音频清单与 HTML 引用一一对应;断网手测播放。"
+  - rationale: G1–G5 每个目标都以「验收：」给出 test、指标或人工检查方式。
+- **goal.quantified** [core, level 2] — 2.1 是否至少有一个 Goal 有数字/单位/明确阈值？
+  - evidence `2.1 目标`: "- **G1 - 端到端可运行（工程）**：输入一份 45–60 分钟英文纪录片 '.srt'（约 500–900 条 cue），一条命令生成离线可打开的 HTML 报告。验收：用《文艺复兴的解放》真实字幕跑通，'report.html' 双击可打开；断网后脉络文字、词表与已下载音频仍可使用。"
+  - normalized: "- **G1 - 端到端可运行(工程)**:输入一份 45–60 分钟英文纪录片 '.srt'(约 500–900 条 cue),一条命令生成离线可打开的 HTML 报告。验收:用《文艺复兴的解放》真实字幕跑通,'report.html' 双击可打开;断网后脉络文字、词表与已下载音频仍可使用。"
+  - rationale: G1 含 45–60 分钟、500–900 条 cue 等数字与区间，G2–G5 另有 6–15 分钟、30–80 条、95%、5 秒等阈值。
+- **goal.count** [extended, level 2] — 2.1 Goals 是否控制在 3–6 个？
+  - evidence `2.1 目标`: "- **G1 - 端到端可运行（工程）**：输入一份 45–60 分钟英文纪录片 '.srt'（约 500–900 条 cue），一条命令生成离线可打开的 HTML 报告。验收：用《文艺复兴的解放》真实字幕跑通，'report.html' 双击可打开；断网后脉络文字、词表与已下载音频仍可使用。"
+  - normalized: "- **G1 - 端到端可运行(工程)**:输入一份 45–60 分钟英文纪录片 '.srt'(约 500–900 条 cue),一条命令生成离线可打开的 HTML 报告。验收:用《文艺复兴的解放》真实字幕跑通,'report.html' 双击可打开;断网后脉络文字、词表与已下载音频仍可使用。"
+  - evidence `2.1 目标`: "- **G5 - 可重复与成本（可靠性）**：同一份输入与配置重跑，付费 LLM 与 TTS 调用次数为 0，报告重建时间小于 5 秒。验收：二次运行日志中 'llm_calls=0'、'tts_calls=0'，并对重建阶段计时。"
+  - normalized: "- **G5 - 可重复与成本(可靠性)**:同一份输入与配置重跑,付费 LLM 与 TTS 调用次数为 0,报告重建时间小于 5 秒。验收:二次运行日志中 'llm_calls=0'、'tts_calls=0',并对重建阶段计时。"
+  - rationale: 2.1 共 G1–G5 五个 Goal，处于 3–6 区间，且每条括号内标注工程/质量/可靠性分类。
+
+## 非目标边界 (non_goal_boundary)
+
+- **nongoal.labeled** [core, level 2] — 2.2 每条 Non-Goal 是否标了本次不做或 Deferred to Phase 2？
+  - evidence `2.2 非目标`: "- **NG1 - 视频处理**：不做视频下载、转码、硬字幕识别（本次不做）。对应 1.2 的「事后整理成本太高」：先用现成字幕切断素材成本，不在视频侧扩范围。"
+  - normalized: "- **NG1 - 视频处理**:不做视频下载、转码、硬字幕识别(本次不做)。对应 1.2 的「事后整理成本太高」:先用现成字幕切断素材成本,不在视频侧扩范围。"
+  - rationale: NG1–NG6 每条都在句中标「本次不做」或「Deferred to Phase 2」。
+- **nongoal.not_dumping_ground** [extended, level 2] — 2.2 非目标是否能追溯到痛点或边界？
+  - evidence `2.2 非目标`: "- **NG4 - 跨报告生词库**：不做累积词库、间隔重复与掌握度追踪（Deferred to Phase 2）。对应 1.2 的「反复查、反复忘」：单份报告先解决「当场学一遍」，跨片累积留到下一阶段。"
+  - normalized: "- **NG4 - 跨报告生词库**:不做累积词库、间隔重复与掌握度追踪(Deferred to Phase 2)。对应 1.2 的「反复查、反复忘」:单份报告先解决「当场学一遍」,跨片累积留到下一阶段。"
+  - rationale: 每条 NG 都带「对应 1.2/1.3/G1/用户定位」的追溯说明，非目标与痛点或边界一一对应。
+
+## 架构自洽 (architecture)
+
+- **arch.solution_shape** [core, level 2] — 第 3 章是否有拓扑或等价的模块/数据流描述？
+  - evidence `3. 架构设计与核心方案`: "flowchart TD     A[".srt 字幕"] --> B["Subtitle Parser"]     B --> C["Content Segmenter"]     C --> D["Narrative Planner<br/>LangChain + ChatDeepSeek"]     C --> E["Vocabulary Extractor<br/>LangChain + ChatDeepSeek"]"
+  - normalized: "flowchart TD A[".srt 字幕"] --> B["Subtitle Parser"] B --> C["Content Segmenter"] C --> D["Narrative Planner<br/>LangChain + ChatDeepSeek"] C --> E["Vocabulary Extractor<br/>LangChain + ChatDeepSeek"]"
+  - rationale: 3.1 的 mermaid 流程图给出从 srt 到 report.html 的完整拓扑，3.2/3.3 补充模块职责与编号数据流。
+- **arch.topology** [extended, level 2] — 3.1 拓扑图是否让每个模块有一句职责？
+  - evidence `3.1 总体架构`: "    A[".srt 字幕"] --> B["Subtitle Parser"]     B --> C["Content Segmenter"]     C --> D["Narrative Planner<br/>LangChain + ChatDeepSeek"]     C --> E["Vocabulary Extractor<br/>LangChain + ChatDeepSeek"]     D --> F["Lexicon Enricher"]     E --> F     F --> G["TTS Provider"]     D --> G     G --> H["Audio Cache"]     F --> H     D --> I["Report Assembler"]     F --> I     H --> I     I --> J["report.html + assets/ + manifest.json"]"
+  - normalized: "A[".srt 字幕"] --> B["Subtitle Parser"] B --> C["Content Segmenter"] C --> D["Narrative Planner<br/>LangChain + ChatDeepSeek"] C --> E["Vocabulary Extractor<br/>LangChain + ChatDeepSeek"] D --> F["Lexicon Enricher"] E --> F F --> G["TTS Provider"] D --> G G --> H["Audio Cache"] F --> H D --> I["Report Assembler"] F --> I H --> I I --> J["report.html + assets/ + manifest.json"]"
+  - rationale: 3.1 拓扑图列出全部模块及连线；紧随的 3.2 为每个模块（含 LangChain 管线骨架）给出一句职责。
+- **arch.change_set** [extended, level 2] — 第 3 章是否写清新增/改造/保持不变？
+  - evidence `3. 架构设计与核心方案`: "- **新增**：Subtitle Parser、Content Segmenter、LangChain 编排层（'langchain'、'langchain-deepseek'）、Narrative Planner、Vocabulary Extractor、Lexicon Enricher、TTS Provider、Audio Cache、Report Assembler、CLI Orchestrator。 - **工程基线**：Python 3.11+、'uv'、'pyproject.toml'、'uv.lock'；依赖安装与命令执行分别使用 'uv sync --frozen' 与 'uv run'。 - **改造**：没有既有模块需要改造；本方案从空仓库起步。 - **保持不变**：用户现有的观影方式与播放器；原始 '.srt' 文件不被修改；报告在断网环境下可读可听；API Key 只存在于环境变量。"
+  - normalized: "- **新增**:Subtitle Parser、Content Segmenter、LangChain 编排层('langchain'、'langchain-deepseek')、Narrative Planner、Vocabulary Extractor、Lexicon Enricher、TTS Provider、Audio Cache、Report Assembler、CLI Orchestrator。 - **工程基线**:Python 3.11+、'uv'、'pyproject.toml'、'uv.lock';依赖安装与命令执行分别使用 'uv sync --frozen' 与 'uv run'。 - **改造**:没有既有模块需要改造;本方案从空仓库起步。 - **保持不变**:用户现有的观影方式与播放器;原始 '.srt' 文件不被修改;报告在断网环境下可读可听;API Key 只存在于环境变量。"
+  - rationale: 3.5 分「新增 / 改造 / 保持不变」三节写清变更集合。
+- **arch.rationale** [extended, level 2] — 关键选型是否有理由，详细对比指向第 7 章？
+  - evidence `3.4 关键选型与约束`: "- **编排框架固定为 LangChain**：用户指定 LangChain；用 'langchain-deepseek' 的 'ChatDeepSeek' 调用 DeepSeek，用 'ChatPromptTemplate' 管理提示，用 'with_structured_output' 约束 Pydantic 模型，用 LCEL 'Runnable' 组合阶段。LangChain 承担整条管线的编排与结构化输出；缓存、音频与渲染作为自定义 'Runnable' 接入，不改变其领域实现。与直接调用 DeepSeek SDK 的对比见 7.6。"
+  - normalized: "- **编排框架固定为 LangChain**:用户指定 LangChain;用 'langchain-deepseek' 的 'ChatDeepSeek' 调用 DeepSeek,用 'ChatPromptTemplate' 管理提示,用 'with_structured_output' 约束 Pydantic 模型,用 LCEL 'Runnable' 组合阶段。LangChain 承担整条管线的编排与结构化输出;缓存、音频与渲染作为自定义 'Runnable' 接入,不改变其领域实现。与直接调用 DeepSeek SDK 的对比见 7.6。"
+  - rationale: 3.4 对 Python、LLM、LangChain、报告形态、TTS 等选型均给出理由，并指向 7.2/7.4/7.5/7.6 的对比。
+
+## 详细设计完整 (detailed_design)
+
+- **design.contract** [core, level 2] — 第 4 章是否至少有一份数据模型或接口契约？
+  - evidence `4. 详细设计`: "\| 实体 \| 字段 \| 类型 \| 必填 \| 校验与说明 \| \| --- \| --- \| --- \| --- \| --- \| \| 'Cue' \| 'cue_id' \| int \| 是 \| 从 1 连续递增，唯一 \| \| 'Cue' \| 'start_ms' / 'end_ms' \| int \| 是 \| '0 ≤ start_ms < end_ms'；允许相邻 cue 时间重叠 \|"
+  - normalized: "\| 实体 \| 字段 \| 类型 \| 必填 \| 校验与说明 \| \| --- \| --- \| --- \| --- \| --- \| \| 'Cue' \| 'cue_id' \| int \| 是 \| 从 1 连续递增,唯一 \| \| 'Cue' \| 'start_ms' / 'end_ms' \| int \| 是 \| '0 ≤ start_ms < end_ms';允许相邻 cue 时间重叠 \|"
+  - rationale: 4.3 给出完整实体字段表，4.4 另给内部接口签名，满足数据模型或接口契约要求。
+- **design.data_model** [extended, level 2] — 4.3 数据模型是否有字段类型、必填与校验？
+  - evidence `4.3 数据模型与契约`: "\| 实体 \| 字段 \| 类型 \| 必填 \| 校验与说明 \| \| --- \| --- \| --- \| --- \| --- \| \| 'Cue' \| 'cue_id' \| int \| 是 \| 从 1 连续递增，唯一 \| \| 'Cue' \| 'start_ms' / 'end_ms' \| int \| 是 \| '0 ≤ start_ms < end_ms'；允许相邻 cue 时间重叠 \|"
+  - normalized: "\| 实体 \| 字段 \| 类型 \| 必填 \| 校验与说明 \| \| --- \| --- \| --- \| --- \| --- \| \| 'Cue' \| 'cue_id' \| int \| 是 \| 从 1 连续递增,唯一 \| \| 'Cue' \| 'start_ms' / 'end_ms' \| int \| 是 \| '0 ≤ start_ms < end_ms';允许相邻 cue 时间重叠 \|"
+  - evidence `4.3 数据模型与契约`: "\| 'NarrativeSection' \| 'audio_refs' \| string[] \| 是 \| 指向 'assets/audio/' 下的一个或多个文件，按播放顺序排列 \| \| 'NarrativeSection' \| 'audio_status' \| enum \| 是 \| 'ready' / 'partial' / 'unavailable'；'ready' 时 'audio_refs' 非空 \|"
+  - normalized: "\| 'NarrativeSection' \| 'audio_refs' \| string[] \| 是 \| 指向 'assets/audio/' 下的一个或多个文件,按播放顺序排列 \| \| 'NarrativeSection' \| 'audio_status' \| enum \| 是 \| 'ready' / 'partial' / 'unavailable';'ready' 时 'audio_refs' 非空 \|"
+  - evidence `4.3 数据模型与契约`: "\| 'TermCandidate' \| 'why_it_matters' \| string \| 是 \| 15–120 字，说明漏掉它会断哪条论证 \|"
+  - normalized: "\| 'TermCandidate' \| 'why_it_matters' \| string \| 是 \| 15–120 字,说明漏掉它会断哪条论证 \|"
+  - evidence `4.3 数据模型与契约`: "\| 'TermEntry' \| 'pronunciation_note' \| string? \| 否 \| 音标缺失、多词关键词发音或 TTS 兜底时说明原因 \|"
+  - normalized: "\| 'TermEntry' \| 'pronunciation_note' \| string? \| 否 \| 音标缺失、多词关键词发音或 TTS 兜底时说明原因 \|"
+  - evidence `4.3 数据模型与契约`: "\| 'TermEntry' \| 'audio_source' \| enum \| 是 \| 'dictionary'（Oxford/Youdao 真人音频）/ 'tts' / 'unavailable' \|"
+  - normalized: "\| 'TermEntry' \| 'audio_source' \| enum \| 是 \| 'dictionary'(Oxford/Youdao 真人音频)/ 'tts' / 'unavailable' \|"
+  - evidence `4.3 数据模型与契约`: "\| 'TermEntry' \| 'why_it_matters' \| string \| 是 \| 15–120 字，从候选词条带入，说明漏掉它会断哪条论证 \|"
+  - normalized: "\| 'TermEntry' \| 'why_it_matters' \| string \| 是 \| 15–120 字,从候选词条带入,说明漏掉它会断哪条论证 \|"
+  - rationale: 4.3 字段表逐行给出类型、必填与校验说明，覆盖 Cue、Segment、NarrativeSection、TermCandidate、TermEntry、ReportManifest 等实体。
+- **design.interface** [extended, level 2] — 4.4 接口是否有请求/响应/状态码或方法签名？
+  - evidence `4.4 接口与协议`: "- 'SubtitleParser.parse(path: Path) -> list[Cue]'：只接受 '.srt'；遇到无法识别的编码或空字幕时抛出 'SubtitleParseError'。"
+  - normalized: "- 'SubtitleParser.parse(path: Path) -> list[Cue]':只接受 '.srt';遇到无法识别的编码或空字幕时抛出 'SubtitleParseError'。"
+  - evidence `4.4 接口与协议`: "- 成功退出码 '0'；输入或解析错误 '2'；LLM 输出不可用 '3'；写盘失败 '4'；部分音频缺失但报告已生成仍返回 '0'，并在摘要中列出缺失数。"
+  - normalized: "- 成功退出码 '0';输入或解析错误 '2';LLM 输出不可用 '3';写盘失败 '4';部分音频缺失但报告已生成仍返回 '0',并在摘要中列出缺失数。"
+  - evidence `4.4 接口与协议`: "阶段实现契约：整条构建管线由 LangChain 'Runnable' 组合；两个 LLM Chain 的输入为 Pydantic 模型或 dict，输出经 'with_structured_output' 校验；字幕解析、词典、TTS 与渲染是非 LLM 的自定义 'Runnable'。LLM Chain 不直接读写缓存或文件，缓存与落盘由 Orchestrator 统一管理。"
+  - normalized: "阶段实现契约:整条构建管线由 LangChain 'Runnable' 组合;两个 LLM Chain 的输入为 Pydantic 模型或 dict,输出经 'with_structured_output' 校验;字幕解析、词典、TTS 与渲染是非 LLM 的自定义 'Runnable'。LLM Chain 不直接读写缓存或文件,缓存与落盘由 Orchestrator 统一管理。"
+  - evidence `4.4 接口与协议`: "- 'ReportAssembler.assemble(manifest: ReportManifest, out_dir: Path) -> Path'：只读本地文件，不发起网络请求；按 'audio_refs' 生成章节播放列表，全局播放器显示进度条与剩余时间；返回 'report.html' 路径。"
+  - normalized: "- 'ReportAssembler.assemble(manifest: ReportManifest, out_dir: Path) -> Path':只读本地文件,不发起网络请求;按 'audio_refs' 生成章节播放列表,全局播放器显示进度条与剩余时间;返回 'report.html' 路径。"
+  - rationale: 4.4 给出方法签名、CLI 退出码、外部 HTTP 状态码处理、阶段实现契约与全局播放器契约。
+- **design.sequence** [extended, level 2] — 4.5 复杂流程是否有时序图或等价分步说明？
+  - evidence `4.5 核心流程与时序`: "    U->>O: situlearn build input.srt --out report/     O->>P: parse(input.srt)     P-->>O: Cue[]"
+  - normalized: "U->>O: situlearn build input.srt --out report/ O->>P: parse(input.srt) P-->>O: Cue[]"
+  - evidence `4.5 核心流程与时序`: "1. **LLM 输出不合法**：结构化输出校验失败时，带校验错误重试 1 次；仍失败则保留已解析的 cue 与缓存，退出码 '3'，不生成半成品报告。"
+  - normalized: "1. **LLM 输出不合法**:结构化输出校验失败时,带校验错误重试 1 次;仍失败则保留已解析的 cue 与缓存,退出码 '3',不生成半成品报告。"
+  - rationale: 4.5 有时序图，并列出四类异常路径及其退出码与降级行为。
+- **design.errors** [extended, level 2] — 4.6 每个错误码是否有触发场景与处理策略？
+  - evidence `4.6 异常处理与错误码`: "\| 错误码 \| 触发场景 \| 处理策略 \| \| --- \| --- \| --- \| \| 'ERR_SUBTITLE_PARSE' \| 文件不是合法 srt、编码无法识别、时间码格式错误 \| 终止；输出首个错误位置与修复建议；退出码 '2' \|"
+  - normalized: "\| 错误码 \| 触发场景 \| 处理策略 \| \| --- \| --- \| --- \| \| 'ERR_SUBTITLE_PARSE' \| 文件不是合法 srt、编码无法识别、时间码格式错误 \| 终止;输出首个错误位置与修复建议;退出码 '2' \|"
+  - evidence `4.6 异常处理与错误码`: "\| 'ERR_TTS_INVALID_RESPONSE' \| 响应缺少 'choices[0].message.audio.data'，或 base64 解码失败 \| 该段标记 'unavailable'；继续其他段；退出码保持 '0' \|"
+  - normalized: "\| 'ERR_TTS_INVALID_RESPONSE' \| 响应缺少 'choices[0].message.audio.data',或 base64 解码失败 \| 该段标记 'unavailable';继续其他段;退出码保持 '0' \|"
+  - rationale: 4.6 错误码表逐条给出触发场景与处理策略，含退出码或降级动作。
+
+## NFR 可度量 (nfr)
+
+- **nfr.measurable** [core, level 2] — 第 5 章每条 NFR 是否有数字、单位或验收方式？
+  - evidence `5. 非功能性需求`: "- **解析延迟**：1,000 条 cue 的 srt 解析在 2 秒内完成 [estimated]。验收：基准脚本对同一文件计时 5 次取中位数。"
+  - normalized: "- **解析延迟**:1,000 条 cue 的 srt 解析在 2 秒内完成 [estimated]。验收:基准脚本对同一文件计时 5 次取中位数。"
+  - evidence `5. 非功能性需求`: "- **外部请求限速与重试**：Oxford/Youdao 每源不超过 8 req/s，词典不超过 5 req/s，TTS 不超过 90 RPM；真人音频解析并发度 2，词典 4，TTS 串行。429/5xx 按 'Retry-After' 或指数退避重试最多 3 次；DeepSeek 客户端最多重试 3 次。验收：用 mock 返回 429，请求间隔不低于配置值，重试次数不超过 3。"
+  - normalized: "- **外部请求限速与重试**:Oxford/Youdao 每源不超过 8 req/s,词典不超过 5 req/s,TTS 不超过 90 RPM;真人音频解析并发度 2,词典 4,TTS 串行。429/5xx 按 'Retry-After' 或指数退避重试最多 3 次;DeepSeek 客户端最多重试 3 次。验收:用 mock 返回 429,请求间隔不低于配置值,重试次数不超过 3。"
+  - rationale: 5.1–5.5 每条 NFR 都带「验收：」说明，5.1/5.2/5.5 的性能、限速与兼容指标另有数字和 [estimated]。
+- **nfr.coverage** [core, level 2] — 第 5 章是否覆盖性能、可靠性、可观测性、安全，或说明不适用？
+  - evidence `5. 非功能性需求`: "- **解析延迟**：1,000 条 cue 的 srt 解析在 2 秒内完成 [estimated]。验收：基准脚本对同一文件计时 5 次取中位数。"
+  - normalized: "- **解析延迟**:1,000 条 cue 的 srt 解析在 2 秒内完成 [estimated]。验收:基准脚本对同一文件计时 5 次取中位数。"
+  - evidence `5. 非功能性需求`: "- **幂等性**：构建键为 'sha256(字幕文件) + sha256(规范化配置)'；相同键重复执行不产生重复词条、重复音频或重复计费。验收：连续两次构建的 'manifest.json' 中词条数与 'assets' 条目数完全一致。"
+  - normalized: "- **幂等性**:构建键为 'sha256(字幕文件) + sha256(规范化配置)';相同键重复执行不产生重复词条、重复音频或重复计费。验收:连续两次构建的 'manifest.json' 中词条数与 'assets' 条目数完全一致。"
+  - evidence `5. 非功能性需求`: "- **运行日志**：每次构建生成 'run.log'（JSON Lines），每个阶段至少 1 条记录，字段包含 'run_id'、'stage'、'duration_ms'、'llm_calls'、'tts_calls'、'input_tokens'、'output_tokens'、'cache_hit'、'error_code'。验收：字段存在性检查脚本对每个阶段记录逐项断言。"
+  - normalized: "- **运行日志**:每次构建生成 'run.log'(JSON Lines),每个阶段至少 1 条记录,字段包含 'run_id'、'stage'、'duration_ms'、'llm_calls'、'tts_calls'、'input_tokens'、'output_tokens'、'cache_hit'、'error_code'。验收:字段存在性检查脚本对每个阶段记录逐项断言。"
+  - evidence `5. 非功能性需求`: "- **密钥管理**：LLM 与 TTS 的密钥只从环境变量读取，不写入 manifest、HTML、日志或缓存键。验收：构建后对全部产物搜索密钥值，命中数为 0。"
+  - normalized: "- **密钥管理**:LLM 与 TTS 的密钥只从环境变量读取,不写入 manifest、HTML、日志或缓存键。验收:构建后对全部产物搜索密钥值,命中数为 0。"
+  - rationale: 5.1 性能、5.2 可靠性、5.3 可观测性、5.4 安全各有正文 bullet 覆盖，四类均具备。
+- **nfr.honesty** [core, level 2] — 未实测的指标是否标了 [estimated] 或 未实现？
+  - evidence `5. 非功能性需求`: "- **端到端构建**：45–60 分钟纪录片、30–80 个词条，在普通笔记本与稳定网络下 15 分钟内完成 [estimated]；该指标不含用户手动补充素材的时间。验收：构建摘要中的各阶段 'duration_ms' 求和。"
+  - normalized: "- **端到端构建**:45–60 分钟纪录片、30–80 个词条,在普通笔记本与稳定网络下 15 分钟内完成 [estimated];该指标不含用户手动补充素材的时间。验收:构建摘要中的各阶段 'duration_ms' 求和。"
+  - evidence `5. 非功能性需求`: "- **运行环境**：Python 3.11 及以上，依赖与虚拟环境由 'uv' 管理；macOS 14+ 与 Ubuntu 22.04+ 为一级支持，Windows 11 尽力支持 [estimated]。验收：CI 在两个一级平台上各执行一次 'uv sync --frozen' 并跑完整冒烟。"
+  - normalized: "- **运行环境**:Python 3.11 及以上,依赖与虚拟环境由 'uv' 管理;macOS 14+ 与 Ubuntu 22.04+ 为一级支持,Windows 11 尽力支持 [estimated]。验收:CI 在两个一级平台上各执行一次 'uv sync --frozen' 并跑完整冒烟。"
+  - rationale: 5.1 全部性能指标与 5.5 兼容性指标均标 [estimated]，未把未实测数字写成已达成。
+
+## 上线可回滚 (rollout)
+
+- **rollout.release** [core, level 2] — 6.1 是否有发布策略与灰度节奏？
+  - evidence `6.1 发布与灰度`: "本工具是本地 CLI，没有生产流量，发布以版本化产物与使用范围逐步扩大代替流量灰度："
+  - normalized: "本工具是本地 CLI,没有生产流量,发布以版本化产物与使用范围逐步扩大代替流量灰度:"
+  - rationale: 6.1 说明本地 CLI 以 Phase 1–3 逐步扩大使用范围代替流量灰度，并给出每阶段通过标准与 tag 固化。
+- **rollout.migration** [core, level 2] — 6.2 是否有迁移/兼容方案，或说明无需迁移？
+  - evidence `6.2 数据迁移与兼容性`: "- **存量数据**：这是新建工具，没有需要迁移的历史数据或数据库。"
+  - normalized: "- **存量数据**:这是新建工具,没有需要迁移的历史数据或数据库。"
+  - rationale: 6.2 明确无历史数据需迁移，并给出 manifest 向后兼容与缓存失效策略。
+- **rollout.smoke** [core, level 2] — 6.3 是否有冒烟清单与观察指标？
+  - evidence `6.3 上线验证与冒烟`: "1. 在干净环境执行 'uv sync --frozen'，然后用一份不少于 300 条 cue 的 srt 构建，确认退出码 '0'。"
+  - normalized: "1. 在干净环境执行 'uv sync --frozen',然后用一份不少于 300 条 cue 的 srt 构建,确认退出码 '0'。"
+  - evidence `6.3 上线验证与冒烟`: "7. 检查 'manifest.json' 的 'config' 记录 'llm_framework=langchain'、'llm_provider=deepseek'、'llm_model=deepseek-flash'、'langchain_version'、'prompt_version'、'narrative_language'、'tts_model' 与 'tts_voice'。"
+  - normalized: "7. 检查 'manifest.json' 的 'config' 记录 'llm_framework=langchain'、'llm_provider=deepseek'、'llm_model=deepseek-flash'、'langchain_version'、'prompt_version'、'narrative_language'、'tts_model' 与 'tts_voice'。"
+  - evidence `6.3 上线验证与冒烟`: "观察指标：'build_success_rate'、'audio_missing_rate'、'term_field_completeness'、'narrative_duration_s'、'cache_hit_rate'。"
+  - normalized: "观察指标:'build_success_rate'、'audio_missing_rate'、'term_field_completeness'、'narrative_duration_s'、'cache_hit_rate'。"
+  - rationale: 6.3 有七步冒烟清单（含框架版本检查）与五项观察指标。
+- **rollout.rollback_trigger** [core, level 2] — 6.4 回滚触发条件是否是可观测数字？
+  - evidence `6.4 回滚与熔断`: "  - 连续 5 次构建中失败次数超过 1 次（失败率大于 20%）。"
+  - normalized: "- 连续 5 次构建中失败次数超过 1 次(失败率大于 20%)。"
+  - rationale: 6.4 用失败率 20%、音频缺失率 10%、命中率 60%、2/3 样本时长越界等可观测数字定义回滚触发。
+- **rollout.rollback_steps** [core, level 2] — 6.4 回滚步骤是否可执行？
+  - evidence `6.4 回滚与熔断`: "  1. 停止使用当前版本，保留最近一份可用的报告目录与 'manifest.json'。   2. 通过版本管理切回上一个通过 Phase 1 的 tag（例如 'git checkout v0.1.0'），或重装上一个已发布版本。"
+  - normalized: "1. 停止使用当前版本,保留最近一份可用的报告目录与 'manifest.json'。 2. 通过版本管理切回上一个通过 Phase 1 的 tag(例如 'git checkout v0.1.0'),或重装上一个已发布版本。"
+  - rationale: 6.4 给出五步可执行回滚流程，含切回上一 tag 的命令与 changelog 记录。
+
+## 替代方案诚实 (alternatives)
+
+- **alts.status_quo** [core, level 2] — 第 7 章是否有 Status Quo 及其成本/风险？
+  - evidence `7. 替代方案与权衡`: "- **成本与风险**：每部纪录片都重复同一条失败链；专业术语反复出现、反复遗忘；艺术家与流派背景无法与片中论证建立联系。"
+  - normalized: "- **成本与风险**:每部纪录片都重复同一条失败链;专业术语反复出现、反复遗忘;艺术家与流派背景无法与片中论证建立联系。"
+  - rationale: 7.1 单列 Status Quo，给出成本/风险与达到阈值的信号。
+- **alts.rejected** [core, level 2] — 第 7 章是否至少有一个被否决方案，且淘汰原因对应当前约束？
+  - evidence `7. 替代方案与权衡`: "- **淘汰原因**：用户已把 LangChain 指定为框架约束；本项目的两个 LLM 阶段需要提示模板、结构化输出、并行组合与 callback 追踪，LangChain 提供了统一抽象。直接 SDK 作为对照保留，不在 v0.1 采用。"
+  - normalized: "- **淘汰原因**:用户已把 LangChain 指定为框架约束;本项目的两个 LLM 阶段需要提示模板、结构化输出、并行组合与 callback 追踪,LangChain 提供了统一抽象。直接 SDK 作为对照保留,不在 v0.1 采用。"
+  - rationale: 7.2–7.6 五个被否决方案均给出淘汰原因；7.6 直接以用户指定的 LangChain 约束淘汰直接 DeepSeek SDK 方案。
+- **alts.matrix** [core, level 2] — 第 7 章是否有与约束对应的权衡矩阵？
+  - evidence `7. 替代方案与权衡`: "\| 维度 \| Status Quo \| 方案 A 聊天解释 \| 方案 B 播放器插件 \| 方案 C 全本地 TTS \| 方案 D 单文件内嵌 \| 方案 E 直接 DeepSeek SDK \| 当前选型 \| \| --- \| --- \| --- \| --- \| --- \| --- \| --- \| --- \| \| 产物可反复使用 \| 否 \| 弱 \| 中 \| 是 \| 是 \| 同当前 \| **是** \|"
+  - normalized: "\| 维度 \| Status Quo \| 方案 A 聊天解释 \| 方案 B 播放器插件 \| 方案 C 全本地 TTS \| 方案 D 单文件内嵌 \| 方案 E 直接 DeepSeek SDK \| 当前选型 \| \| --- \| --- \| --- \| --- \| --- \| --- \| --- \| --- \| \| 产物可反复使用 \| 否 \| 弱 \| 中 \| 是 \| 是 \| 同当前 \| **是** \|"
+  - rationale: 7.7 矩阵以产物复用、离线收听、成本、音质、隐私与 LangChain 框架契合等维度对比全部方案。
+- **alts.consistency** [core, level 2] — 第 7 章结论是否与 Goals、架构选型一致？
+  - evidence `7. 替代方案与权衡`: "矩阵结论与第 2 章一致：G1 要求端到端生成可离线打开的产物，排除 Status Quo 与方案 A；G2 要求脉络与音频，排除方案 B；G4 对音质与可用率的要求排除方案 C 作为默认；方案 D 在体积与浏览器兼容性上不如目录式产物；方案 E 不满足 LangChain 框架约束。"
+  - normalized: "矩阵结论与第 2 章一致:G1 要求端到端生成可离线打开的产物,排除 Status Quo 与方案 A;G2 要求脉络与音频,排除方案 B;G4 对音质与可用率的要求排除方案 C 作为默认;方案 D 在体积与浏览器兼容性上不如目录式产物;方案 E 不满足 LangChain 框架约束。"
+  - rationale: 7.7 结论逐条引用 G1/G2/G4、LangChain 约束与第 3 章选型，和 Goals 及架构保持一致。
+
+## 跨章自洽 (cross_consistency)
+
+- **x.goals_trace** [core, level 2] — 后续章节是否逐条回应 Goals？
+  - evidence `全文`: "\| Goal \| 主要落点 \| \| --- \| --- \| \| G1 \| 3.1 总体架构；4.4 CLI 契约；6.3 冒烟清单 \| \| G2 \| 3.2 Narrative Planner；4.3 NarrativeScript；4.5 时序 \| \| G3 \| 3.2 Vocabulary Extractor；4.3 TermEntry；4.4 抽词契约 \| \| G4 \| 3.2 TTS Provider；4.4 语音接口；5.2 降级策略 \| \| G5 \| 4.1 阶段缓存；5.2 幂等性；6.3 重跑冒烟 \|"
+  - normalized: "\| Goal \| 主要落点 \| \| --- \| --- \| \| G1 \| 3.1 总体架构;4.4 CLI 契约;6.3 冒烟清单 \| \| G2 \| 3.2 Narrative Planner;4.3 NarrativeScript;4.5 时序 \| \| G3 \| 3.2 Vocabulary Extractor;4.3 TermEntry;4.4 抽词契约 \| \| G4 \| 3.2 TTS Provider;4.4 语音接口;5.2 降级策略 \| \| G5 \| 4.1 阶段缓存;5.2 幂等性;6.3 重跑冒烟 \|"
+  - rationale: 2.1 新增的追溯表为 G1–G5 逐一列出后续章节落点，五个 Goal 都能在后续设计、NFR 与冒烟章节找到对应。
+- **x.nfr_arch** [core, level 2] — NFR 与架构、选型是否一致？
+  - evidence `全文`: "- **Chain 级追踪**：通过 LangChain callback 记录每个 'Runnable' 的输入长度、输出长度、耗时与 token 用量，默认写入本地 'run.log'，不依赖 LangSmith。验收：每次构建至少 2 条 chain 事件，字段齐全。"
+  - normalized: "- **Chain 级追踪**:通过 LangChain callback 记录每个 'Runnable' 的输入长度、输出长度、耗时与 token 用量,默认写入本地 'run.log',不依赖 LangSmith。验收:每次构建至少 2 条 chain 事件,字段齐全。"
+  - evidence `全文`: "- **编排框架固定为 LangChain**：用户指定 LangChain；用 'langchain-deepseek' 的 'ChatDeepSeek' 调用 DeepSeek，用 'ChatPromptTemplate' 管理提示，用 'with_structured_output' 约束 Pydantic 模型，用 LCEL 'Runnable' 组合阶段。LangChain 承担整条管线的编排与结构化输出；缓存、音频与渲染作为自定义 'Runnable' 接入，不改变其领域实现。与直接调用 DeepSeek SDK 的对比见 7.6。"
+  - normalized: "- **编排框架固定为 LangChain**:用户指定 LangChain;用 'langchain-deepseek' 的 'ChatDeepSeek' 调用 DeepSeek,用 'ChatPromptTemplate' 管理提示,用 'with_structured_output' 约束 Pydantic 模型,用 LCEL 'Runnable' 组合阶段。LangChain 承担整条管线的编排与结构化输出;缓存、音频与渲染作为自定义 'Runnable' 接入,不改变其领域实现。与直接调用 DeepSeek SDK 的对比见 7.6。"
+  - rationale: 5.3 的 Chain 级追踪直接对应 3.2/3.4 的 LangChain 管线骨架与 callback 设计；离线渲染与缓存类 NFR 也与架构一致。
+- **x.rollback_release** [core, level 2] — 回滚与发布策略是否一致？
+  - evidence `全文`: "每个阶段以 git tag 固化版本；不满足通过标准时不进入下一阶段。"
+  - normalized: "每个阶段以 git tag 固化版本;不满足通过标准时不进入下一阶段。"
+  - evidence `全文`: "  2. 通过版本管理切回上一个通过 Phase 1 的 tag（例如 'git checkout v0.1.0'），或重装上一个已发布版本。"
+  - normalized: "2. 通过版本管理切回上一个通过 Phase 1 的 tag(例如 'git checkout v0.1.0'),或重装上一个已发布版本。"
+  - rationale: 发布以 Phase 与 git tag 固化，回滚切回上一个通过 Phase 1 的 tag，二者节奏与版本口径一致。
+
+## 证据卫生 (evidence_hygiene)
+
+- **x.no_placeholders** [core, level 2] — 是否没有把 无 / ... / 待补充 / TBD 当作实质回答？
+  - evidence `全文`: "> 原 A1（术语样本）、原 A2（TTS 供应商）、原 A3（词典音频署名）已在 2026-11-02 的修订中解决：词例见 1.2，供应商见 3.4 与 4.2，署名要求见 5.4。"
+  - normalized: "> 原 A1(术语样本)、原 A2(TTS 供应商)、原 A3(词典音频署名)已在 2026-11-02 的修订中解决:词例见 1.2,供应商见 3.4 与 4.2,署名要求见 5.4。"
+  - evidence `全文`: "- **A1 - TTS 定价风险**：小米 'mimo-v2.5-tts' 当前限时免费，官方未给额度、到期日或商业使用条款；用户已确认仅个人使用。责任人是 alang，计划在 Phase 2 前设定每月预算上限，并准备一个可切换的备选 TTS 实现。"
+  - normalized: "- **A1 - TTS 定价风险**:小米 'mimo-v2.5-tts' 当前限时免费,官方未给额度、到期日或商业使用条款;用户已确认仅个人使用。责任人是 alang,计划在 Phase 2 前设定每月预算上限,并准备一个可切换的备选 TTS 实现。"
+  - evidence `全文`: "- **A5 - LangChain 版本锁定**：'langchain' 与 'langchain-deepseek' 的版本由 'uv.lock' 锁定；具体版本尚未选定，minor 版本常有 API 变动。责任人是 alang，计划在 Phase 1 前选定一组通过冒烟的版本并提交 lockfile，之后升级需重跑冒烟清单。"
+  - normalized: "- **A5 - LangChain 版本锁定**:'langchain' 与 'langchain-deepseek' 的版本由 'uv.lock' 锁定;具体版本尚未选定,minor 版本常有 API 变动。责任人是 alang,计划在 Phase 1 前选定一组通过冒烟的版本并提交 lockfile,之后升级需重跑冒烟清单。"
+  - evidence `全文`: "- **A6 - DeepSeek 模型版本**：默认 'deepseek-flash'（已用最小请求验证可用），叙事梳理可切 'deepseek-reasoner'；具体版本号与上下文上限以官方文档为准，Phase 1 前锁定并记录到 manifest。"
+  - normalized: "- **A6 - DeepSeek 模型版本**:默认 'deepseek-flash'(已用最小请求验证可用),叙事梳理可切 'deepseek-reasoner';具体版本号与上下文上限以官方文档为准,Phase 1 前锁定并记录到 manifest。"
+  - evidence `全文`: "- **A7 - 残留 TTS 词条的发音质量**：全中文播报固定使用 '冰糖'；仅 'Renascita'、'Saint Donasian' 等无免费真人音源的词条使用 TTS，需人工试听确认可接受。"
+  - normalized: "- **A7 - 残留 TTS 词条的发音质量**:全中文播报固定使用 '冰糖';仅 'Renascita'、'Saint Donasian' 等无免费真人音源的词条使用 TTS,需人工试听确认可接受。"
+  - evidence `全文`: "- **A8 - 真人音频许可**：Oxford Learner's Dictionaries 与 Youdao Dictionary 的音频用于本地个人学习；若未来分享报告，需重新评估再分发许可或改用 Wiktionary 真人音频。"
+  - normalized: "- **A8 - 真人音频许可**:Oxford Learner's Dictionaries 与 Youdao Dictionary 的音频用于本地个人学习;若未来分享报告,需重新评估再分发许可或改用 Wiktionary 真人音频。"
+  - rationale: 正文无 TBD/.../待补充 作为回答；附录 A 已关闭原 A1–A3，剩余项要么显式延后（A2–A4），要么带责任人与计划（A1、A5、A6、A7、A8），不是占位。
+- **x.no_code** [core, level 2] — 是否没有堆砌实现代码、测试日志或偶发报错？
+  - evidence `全文`: "- 'NarrativePlanner.plan(cues: list[Cue], config: PlanConfig) -> NarrativeScript'：一次调用完成；返回值必须通过 'NarrativeScript' 的 JSON Schema 校验。"
+  - normalized: "- 'NarrativePlanner.plan(cues: list[Cue], config: PlanConfig) -> NarrativeScript':一次调用完成;返回值必须通过 'NarrativeScript' 的 JSON Schema 校验。"
+  - rationale: 全文只有 mermaid 图与接口签名/契约，没有实现代码、测试日志或偶发报错堆砌。
+- **x.numbers_sourced** [core, level 2] — 关键数字是否有出处，或标了 [estimated]？
+  - evidence `全文`: "- **解析延迟**：1,000 条 cue 的 srt 解析在 2 秒内完成 [estimated]。"
+  - normalized: "- **解析延迟**:1,000 条 cue 的 srt 解析在 2 秒内完成 [estimated]。"
+  - evidence `全文`: "- **运行环境**：Python 3.11 及以上，依赖与虚拟环境由 'uv' 管理；macOS 14+ 与 Ubuntu 22.04+ 为一级支持，Windows 11 尽力支持 [estimated]。验收：CI 在两个一级平台上各执行一次 'uv sync --frozen' 并跑完整冒烟。"
+  - normalized: "- **运行环境**:Python 3.11 及以上,依赖与虚拟环境由 'uv' 管理;macOS 14+ 与 Ubuntu 22.04+ 为一级支持,Windows 11 尽力支持 [estimated]。验收:CI 在两个一级平台上各执行一次 'uv sync --frozen' 并跑完整冒烟。"
+  - rationale: 性能与兼容性等实测类数字标 [estimated]；其余数字为配置或验收阈值，不属外部事实断言。
+- **x.no_fabricated_refs** [core, level 2] — 是否没有捏造 SPEC 引用、depends_on 目标或 M<N>？
+  - evidence `全文`: "depends_on:   - docs/architecture/system.md"
+  - normalized: "depends_on: - docs/architecture/system.md"
+  - evidence `全文`: "\| 关联资源 \| [总体架构](../../architecture/system.md)；本地字幕样本《文艺复兴的解放》 \|"
+  - normalized: "\| 关联资源 \| [总体架构](../../architecture/system.md);本地字幕样本《文艺复兴的解放》 \|"
+  - rationale: depends_on 与关联资源指向同一 docs/architecture/system.md，全文无 SPEC 编号引用或 M<N> 标记。
+
+## Audit failures
+
+None.
