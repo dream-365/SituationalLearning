@@ -1,0 +1,42 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">情景学习报告</p>
+  <h1>{{ report.title }}</h1>
+  <p class="logline">{{ report.logline }}</p>
+  <p class="meta">
+    {{ report.duration_min }} 分钟 · {{ report.sections | length }} 章 ·
+    {{ report.terms | length }} 个词条
+  </p>
+  <p class="background">{{ report.background }}</p>
+</section>
+
+<section class="chapter-section" aria-labelledby="chapters-heading">
+  <div class="section-head">
+    <h2 id="chapters-heading">内容脉络</h2>
+    <a href="/r/{{ report.slug }}/vocabulary">查看词表</a>
+  </div>
+  <div class="chapter-list">
+    {% for section in report.sections %}
+    <article class="chapter" data-section-id="{{ section.section_id }}">
+      <div class="chapter-head">
+        <h3><a href="/r/{{ report.slug }}/chapters/{{ section.section_id }}">{{ section.heading }}</a></h3>
+      </div>
+      <p>{{ section.summary }}</p>
+      <div class="chapter-actions">
+        <span class="chapter-time">{{ section.start }}–{{ section.end }}</span>
+        <button
+          class="play"
+          type="button"
+          data-srcs='{{ section.audio_refs | tojson }}'
+          data-label="{{ section.heading }}"
+          data-section-id="{{ section.section_id }}"
+          {% if not section.audio_available %}disabled{% endif %}
+        >{% if section.audio_available %}播放本节{% else %}暂无音频{% endif %}</button>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

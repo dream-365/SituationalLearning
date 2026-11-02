@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{{ page_title }} · 情景学习</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="manifest" href="/r/{{ report.slug }}/manifest.webmanifest">
+</head>
+<body class="page-{{ page }}" data-report-slug="{{ report.slug }}">
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="site-header">
+    <a class="brand" href="/r/{{ report.slug }}">情景学习</a>
+    <nav class="site-nav" aria-label="报告导航">
+      <a href="/r/{{ report.slug }}"{% if page == "report" %} aria-current="page"{% endif %}>报告</a>
+      <a href="/r/{{ report.slug }}/vocabulary"{% if page == "vocabulary" %} aria-current="page"{% endif %}>词表</a>
+    </nav>
+  </header>
+
+  <main class="site-main" id="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <p>{{ report.attribution | join(" · ") }}</p>
+  </footer>
+
+  <script src="/static/player.js" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
