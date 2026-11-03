@@ -51,6 +51,8 @@ The build writes `report.html`, `manifest.json`, and `assets/audio/` into the ou
 
 ## Publish to the web
 
+The step-by-step publishing checklist (local LAN HTTPS, public K3s, verification, and rollback) is in [`docs/runbooks/publish-report.md`](docs/runbooks/publish-report.md).
+
 The web service serves public, unguessable report URLs. Build stays local; only the finished report is uploaded.
 
 ```bash
@@ -91,8 +93,8 @@ SITULEARN_PUBLISH_TOKEN=dev-token \
 The deployment resources live in `deploy/k8s`. Build and push an image first, then update the image tag in `deploy/k8s/overlays/prod/kustomization.yaml`.
 
 ```bash
-docker build -t ghcr.io/dream-365/situlearn-web:0.2.0 .
-docker push ghcr.io/dream-365/situlearn-web:0.2.0
+docker build -t ghcr.io/dream-365/situlearn-web:0.2.2 .
+docker push ghcr.io/dream-365/situlearn-web:0.2.2
 
 kubectl create namespace situlearn --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic situlearn-secrets -n situlearn \
