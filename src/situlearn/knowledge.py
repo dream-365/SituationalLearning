@@ -7,6 +7,11 @@ from enum import StrEnum
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 
+class ContentType(StrEnum):
+    DOCUMENTARY = "documentary"
+    MOVIE = "movie"
+
+
 class AudioStatus(StrEnum):
     READY = "ready"
     PARTIAL = "partial"
@@ -58,7 +63,9 @@ class NarrativeScript(BaseModel):
     title: str = Field(min_length=1, max_length=30)
     logline: str = Field(min_length=1, max_length=120)
     background: str = Field(min_length=1, max_length=600)
-    sections: list[NarrativeSection] = Field(min_length=4, max_length=8)
+    # 4-12 is the union of content-type profiles (documentary 4-8, movie
+    # 6-12). The pipeline validates against the active profile.
+    sections: list[NarrativeSection] = Field(min_length=4, max_length=12)
 
     @model_validator(mode="after")
     def _sections_are_ordered(self) -> NarrativeScript:

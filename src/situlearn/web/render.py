@@ -8,7 +8,8 @@ from pathlib import Path, PurePosixPath
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from situlearn.knowledge import ReportManifest
+from situlearn.content import ReportLabels, profile_for_manifest
+from situlearn.knowledge import ContentType, ReportManifest
 from situlearn.web.objectstore import ObjectStoreError
 from situlearn.web.repository import ReportRecord, ReportRepository
 from situlearn.web.storage import ReportStore
@@ -45,6 +46,8 @@ class PublicReport:
     sections: tuple[dict[str, object], ...]
     terms: tuple[dict[str, object], ...]
     attribution: tuple[str, ...]
+    content_type: ContentType
+    labels: ReportLabels
 
     @property
     def slug(self) -> str:
@@ -141,6 +144,7 @@ def load_public_report(
     except (ObjectStoreError, UnicodeDecodeError, ValueError) as exc:
         raise ReportNotFound(slug) from exc
 
+    profile = profile_for_manifest(manifest)
     sections = _build_sections(manifest, slug)
     terms = _build_terms(manifest, slug, sections)
     return PublicReport(
@@ -157,6 +161,8 @@ def load_public_report(
             "Youdao Dictionary",
             "小米 MiMo TTS",
         ),
+        content_type=profile.content_type,
+        labels=profile.labels,
     )
 
 

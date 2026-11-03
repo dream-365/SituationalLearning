@@ -2,11 +2,11 @@
 
 {% block content %}
 <section class="hero">
-  <p class="eyebrow">情景学习报告</p>
+  <p class="eyebrow">{{ report.labels.web_eyebrow }}</p>
   <h1>{{ report.title }}</h1>
   <p class="logline">{{ report.logline }}</p>
   <p class="meta">
-    {{ report.duration_min }} 分钟 · {{ report.sections | length }} 章 ·
+    {{ report.duration_min }} 分钟 · {{ report.sections | length }} {{ report.labels.section_counter_unit }} ·
     {{ report.terms | length }} 个词条
   </p>
   <p class="background">{{ report.background }}</p>
@@ -14,7 +14,7 @@
 
 <section class="chapter-section" aria-labelledby="chapters-heading">
   <div class="section-head">
-    <h2 id="chapters-heading">内容脉络</h2>
+    <h2 id="chapters-heading">{{ report.labels.narrative_heading }}</h2>
     <a href="/r/{{ report.slug }}/vocabulary">查看词表</a>
   </div>
   <div class="chapter-list">
@@ -33,7 +33,7 @@
           data-label="{{ section.heading }}"
           data-section-id="{{ section.section_id }}"
           {% if not section.audio_available %}disabled{% endif %}
-        >{% if section.audio_available %}播放本节{% else %}暂无音频{% endif %}</button>
+        >{% if section.audio_available %}{{ report.labels.play_section }}{% else %}{{ report.labels.no_audio }}{% endif %}</button>
       </div>
     </article>
     {% endfor %}

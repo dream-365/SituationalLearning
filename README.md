@@ -1,10 +1,12 @@
 # 情景学习（SituLearn）
 
-Turn a documentary `.srt` into an offline HTML study report: a Chinese spoken narrative, plus a vocabulary notebook with IPA, bilingual definitions, context sentences, and human pronunciation.
+Turn a documentary or movie `.srt` into an offline HTML study report: a Chinese spoken narrative, plus a vocabulary notebook with IPA, bilingual definitions, context sentences, and human pronunciation.
 
 ## Status
 
 Working end-to-end on a 60-minute documentary sample: 8 Chinese narrative chapters, 74 terms, 73/74 human pronunciation clips, 82 offline audio files. Full build about 9 minutes; fully cached rebuild under 1 second. The report includes a bottom progress player with current/total time and remaining time.
+
+Two content types are supported: `documentary` (default, argument-led narrative) and `movie` (post-viewing plot recap, 6-12 scenes, spoilers allowed).
 
 The new web layer publishes a built report to a public, unguessable URL so it can be opened and listened to on an iPad. It adds server-side rendering, background playback with Media Session, per-device progress memory, and a PWA home-screen entry.
 
@@ -13,6 +15,7 @@ Specs:
 - `docs/specs/SPEC-001-subtitle-learning-report/spec.md` (Approved)
 - `docs/specs/SPEC-002-report-web-publishing/spec.md` (Approved)
 - `docs/specs/SPEC-002-report-web-publishing/tasks.md` (In Progress)
+- `docs/specs/SPEC-003-content-type-profiles/spec.md` (Approved)
 
 ## Install
 
@@ -47,7 +50,13 @@ situlearn build your-documentary.en.srt --out reports/your-documentary
 open reports/your-documentary/report.html
 ```
 
-The build writes `report.html`, `manifest.json`, and `assets/audio/` into the output directory. The generated report is fully offline. Progress is printed to stderr as each stage runs; stage and audio caches live in `~/.cache/situlearn/` and are reused on the next build unless `--force` is passed.
+For a narrative film, pass `--content-type movie`. Movie reports are post-viewing recaps: they may spoil the plot, use 6-12 scene sections, and switch the report copy to plot/scene language.
+
+```bash
+situlearn build your-movie.en.srt --content-type movie --out reports/your-movie
+```
+
+The build writes `report.html`, `manifest.json`, and `assets/audio/` into the output directory. The generated report is fully offline. Progress is printed to stderr as each stage runs; stage and audio caches live in `~/.cache/situlearn/` and are reused on the next build unless `--force` is passed. Documentary and movie builds of the same subtitle use separate cache namespaces, so switching content type does not reuse the other type's LLM output.
 
 ## Publish to the web
 
@@ -60,7 +69,7 @@ export SITULEARN_PUBLISH_TOKEN=...
 situlearn publish reports/your-documentary --server https://learn.example.com
 ```
 
-The command prints the `slug` and public URL. Publishing the same subtitle again replaces the same URL:
+The command prints the `slug` and public URL. Publishing the same subtitle again replaces the same URL. The same subtitle built as both `documentary` and `movie` also maps to the same URL, so the last publish wins; keep the two report directories separate locally if you want to switch back and forth:
 
 ```bash
 situlearn publish reports/your-documentary --server https://learn.example.com

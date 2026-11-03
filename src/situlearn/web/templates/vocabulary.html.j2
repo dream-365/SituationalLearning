@@ -9,9 +9,9 @@
 
   <form class="filters" method="get" action="/r/{{ report.slug }}/vocabulary">
     <label>
-      <span>章节</span>
+      <span>{{ report.labels.section_unit }}</span>
       <select name="section">
-        <option value="">全部章节</option>
+        <option value="">{{ report.labels.all_sections }}</option>
         {% for section in sections %}
         <option value="{{ section.section_id }}"{% if section.section_id == selected_section %} selected{% endif %}>{{ section.heading }}</option>
         {% endfor %}

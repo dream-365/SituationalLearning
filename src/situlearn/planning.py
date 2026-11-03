@@ -45,7 +45,7 @@ class PlannedNarrative(BaseModel):
     title: str | None = None
     logline: str | None = None
     background: str | None = None
-    sections: list[PlannedSection] = Field(min_length=4, max_length=8)
+    sections: list[PlannedSection] = Field(min_length=4, max_length=12)
 
     @field_validator("sections", mode="before")
     @classmethod

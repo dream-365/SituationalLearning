@@ -8,10 +8,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_deepseek import ChatDeepSeek
 from pydantic import AliasChoices, BaseModel, Field, ValidationError, field_validator
 
+from situlearn.content import ContentProfile, profile_for
 from situlearn.dictionary import DictionaryEntry
 from situlearn.knowledge import AudioSource, SourceRef, TermCandidate, TermEntry
 from situlearn.llm import invoke_with_retry, structured_output
-from situlearn.prompts import GLOSS_SYSTEM, GLOSS_USER
+from situlearn.prompts import prompts_for
 
 
 class TermGloss(BaseModel):
@@ -48,9 +49,13 @@ def gloss_terms(
     llm: ChatDeepSeek,
     terms: list[TermCandidate],
     dictionary: dict[str, DictionaryEntry],
+    *,
+    profile: ContentProfile | None = None,
 ) -> list[TermEntry]:
     """Ask the model for contextual bilingual glosses, then merge dictionary data."""
 
+    profile = profile or profile_for()
+    prompt_set = prompts_for(profile.content_type)
     payload = []
     for term in terms:
         entry = dictionary.get(term.lemma.casefold()) or dictionary.get(term.term.casefold())
@@ -64,7 +69,7 @@ def gloss_terms(
         )
 
     prompt = ChatPromptTemplate.from_messages(
-        [("system", GLOSS_SYSTEM), ("user", GLOSS_USER)]
+        [("system", prompt_set.gloss_system), ("user", prompt_set.gloss_user)]
     )
     chain = prompt | structured_output(llm, TermGlosses)
     result = invoke_with_retry(chain, {"terms_json": json.dumps(payload, ensure_ascii=False)})

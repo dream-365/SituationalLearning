@@ -10,7 +10,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_deepseek import ChatDeepSeek
 from pydantic import AliasChoices, BaseModel, Field, ValidationError
 
-from situlearn.knowledge import NarrativeScript, TermCandidate
+from situlearn.content import ContentProfile, profile_for
+from situlearn.knowledge import ContentType, NarrativeScript, TermCandidate
 from situlearn.llm import invoke_with_retry, structured_output
 from situlearn.models import Segment
 from situlearn.planning import (
@@ -19,14 +20,7 @@ from situlearn.planning import (
     to_narrative_script,
     to_term_candidates,
 )
-from situlearn.prompts import (
-    CHINESE_REPAIR_SYSTEM,
-    CHINESE_REPAIR_USER,
-    NARRATIVE_SYSTEM,
-    NARRATIVE_USER,
-    VOCAB_SYSTEM,
-    VOCAB_USER,
-)
+from situlearn.prompts import prompts_for
 
 LATIN_RE = re.compile(r"[A-Za-z][A-Za-z'’-]*")
 
@@ -44,7 +38,7 @@ class NarrativeTextPatch(BaseModel):
     background: str = Field(min_length=1, max_length=600)
     sections: list[SectionTextPatch] = Field(
         min_length=4,
-        max_length=8,
+        max_length=12,
         validation_alias=AliasChoices("sections", "items"),
     )
 
@@ -70,30 +64,42 @@ def _format_narrative_context(script: NarrativeScript) -> str:
     return "\n\n".join(lines)
 
 
-def plan_narrative(llm: ChatDeepSeek, segments: list[Segment]) -> NarrativeScript:
+def plan_narrative(
+    llm: ChatDeepSeek,
+    segments: list[Segment],
+    *,
+    profile: ContentProfile | None = None,
+    source_name: str | None = None,
+) -> NarrativeScript:
     """Produce a Chinese spoken narrative from the full transcript."""
 
+    profile = profile or profile_for()
+    prompt_set = prompts_for(profile.content_type)
     duration_min = (segments[-1].end_ms - segments[0].start_ms) / 60_000
     prompt = ChatPromptTemplate.from_messages(
-        [("system", NARRATIVE_SYSTEM), ("user", NARRATIVE_USER)]
+        [("system", prompt_set.narrative_system), ("user", prompt_set.narrative_user)]
     )
     chain = prompt | structured_output(llm, PlannedNarrative)
-    planned = invoke_with_retry(
-        chain,
-        {
-            "transcript": format_transcript(segments),
-            "duration_min": duration_min,
-        },
-    )
+    payload: dict[str, object] = {
+        "transcript": format_transcript(segments),
+        "duration_min": duration_min,
+    }
+    if profile.content_type is ContentType.MOVIE:
+        payload["source_name"] = source_name or "未命名影片"
+    planned = invoke_with_retry(chain, payload)
     return to_narrative_script(planned, segments)
 
 
 def repair_narrative_chinese(
     llm: ChatDeepSeek,
     script: NarrativeScript,
+    *,
+    profile: ContentProfile | None = None,
 ) -> NarrativeScript:
     """Rewrite any English words in the narrative prose into Chinese."""
 
+    profile = profile or profile_for()
+    prompt_set = prompts_for(profile.content_type)
     texts = [script.title, script.logline, script.background]
     for section in script.sections:
         texts.extend([section.heading, section.summary, section.spoken_text])
@@ -115,7 +121,7 @@ def repair_narrative_chinese(
         ],
     }
     prompt = ChatPromptTemplate.from_messages(
-        [("system", CHINESE_REPAIR_SYSTEM), ("user", CHINESE_REPAIR_USER)]
+        [("system", prompt_set.repair_system), ("user", prompt_set.repair_user)]
     )
     chain = prompt | structured_output(llm, NarrativeTextPatch)
     try:
@@ -158,11 +164,15 @@ def extract_terms(
     llm: ChatDeepSeek,
     segments: list[Segment],
     script: NarrativeScript,
+    *,
+    profile: ContentProfile | None = None,
 ) -> list[TermCandidate]:
     """Extract key blocking terms from the transcript and narrative."""
 
+    profile = profile or profile_for()
+    prompt_set = prompts_for(profile.content_type)
     prompt = ChatPromptTemplate.from_messages(
-        [("system", VOCAB_SYSTEM), ("user", VOCAB_USER)]
+        [("system", prompt_set.vocab_system), ("user", prompt_set.vocab_user)]
     )
     chain = prompt | structured_output(llm, ExtractedTerms)
     payload = {

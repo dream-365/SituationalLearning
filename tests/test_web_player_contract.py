@@ -57,9 +57,20 @@ def test_player_persists_and_restores_chapter_progress():
 def test_templates_wire_player_to_sections():
     assert "/static/player.js" in BASE_TEMPLATE
     assert 'data-report-slug="{{ report.slug }}"' in BASE_TEMPLATE
+    assert 'data-this-section="{{ report.labels.this_section }}"' in BASE_TEMPLATE
+    assert 'data-prev-label="{{ report.labels.previous_section }}"' in BASE_TEMPLATE
+    assert 'data-next-label="{{ report.labels.next_section }}"' in BASE_TEMPLATE
     assert 'data-section-id="{{ section.section_id }}"' in REPORT_TEMPLATE
     assert 'data-section-id="{{ section.section_id }}"' in CHAPTER_TEMPLATE
     assert "data-srcs=" in REPORT_TEMPLATE
+
+
+def test_player_reads_content_type_labels_from_body():
+    assert "document.body.dataset.prevLabel" in PLAYER_TEXT
+    assert "document.body.dataset.nextLabel" in PLAYER_TEXT
+    assert "document.body.dataset.thisSection" in PLAYER_TEXT
+    assert '"上一章"' in PLAYER_TEXT
+    assert '"下一章"' in PLAYER_TEXT
 
 
 def test_player_javascript_parses():

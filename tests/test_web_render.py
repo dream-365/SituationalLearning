@@ -15,7 +15,10 @@ REPORT_KEY = "a" * 64
 TOKEN = "render-token"
 
 
-def _manifest(title: str = "Render Test Report") -> dict:
+def _manifest(
+    title: str = "Render Test Report",
+    config: dict | None = None,
+) -> dict:
     sections = [
         {
             "section_id": f"s{index}",
@@ -38,7 +41,7 @@ def _manifest(title: str = "Render Test Report") -> dict:
             "duration_ms": 4_000,
             "cue_count": 4,
         },
-        "config": {"llm_model": "test-model"},
+        "config": config or {"llm_model": "test-model"},
         "narrative": {
             "title": title,
             "logline": "A render test logline",
@@ -75,9 +78,9 @@ def _manifest(title: str = "Render Test Report") -> dict:
     }
 
 
-def _archive_bytes() -> bytes:
+def _archive_bytes(manifest: dict | None = None) -> bytes:
     files = {
-        "manifest.json": json.dumps(_manifest(), ensure_ascii=False).encode(),
+        "manifest.json": json.dumps(manifest or _manifest(), ensure_ascii=False).encode(),
         "assets/audio/term.mp3": b"term-audio",
     }
     for index in range(4):
@@ -103,11 +106,17 @@ def _client(settings: Settings) -> TestClient:
     return TestClient(create_app(settings, configure_logs=False))
 
 
-def _publish(client: TestClient) -> str:
+def _publish(client: TestClient, manifest: dict | None = None) -> str:
     response = client.post(
         "/api/v1/reports",
         headers={"Authorization": f"Bearer {TOKEN}"},
-        files={"archive": ("report.tar.gz", _archive_bytes(), "application/gzip")},
+        files={
+            "archive": (
+                "report.tar.gz",
+                _archive_bytes(manifest),
+                "application/gzip",
+            )
+        },
         data={"report_key": REPORT_KEY, "schema_version": "1.0.0"},
     )
     assert response.status_code == 201, response.text
@@ -130,6 +139,32 @@ def test_report_home_renders_public_content(tmp_path):
     assert "test-model" not in html
     assert REPORT_KEY not in html
     assert "report_id" not in html
+
+
+def test_movie_report_uses_plot_labels(tmp_path):
+    manifest = _manifest(config={"content_type": "movie"})
+    with _client(_settings(tmp_path)) as client:
+        slug = _publish(client, manifest)
+        response = client.get(f"/r/{slug}")
+        chapter = client.get(f"/r/{slug}/chapters/s0")
+        vocabulary = client.get(f"/r/{slug}/vocabulary")
+
+    assert response.status_code == 200
+    html = response.text
+    assert "剧情脉络" in html
+    assert "电影报告" in html
+    assert "播放本场" in html
+    assert 'data-prev-label="上一场"' in html
+    assert 'data-next-label="下一场"' in html
+    assert "内容脉络" not in html
+    assert "test-model" not in html
+
+    assert "场景" in chapter.text
+    assert "播放本场" in chapter.text
+    assert "本场关键词" in chapter.text
+
+    assert "全部场景" in vocabulary.text
+    assert "场景" in vocabulary.text
 
 
 def test_chapter_page_renders_spoken_text(tmp_path):

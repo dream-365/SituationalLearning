@@ -7,6 +7,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from situlearn.content import profile_for_manifest
 from situlearn.knowledge import ReportManifest
 
 CATEGORY_LABELS = {
@@ -31,6 +32,7 @@ def assemble_report(manifest: ReportManifest, out_dir: Path) -> Path:
     """Write report.html and return its path."""
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    profile = profile_for_manifest(manifest)
     env = Environment(
         loader=FileSystemLoader(_template_dir()),
         autoescape=select_autoescape(["html", "xml"]),
@@ -79,6 +81,8 @@ def assemble_report(manifest: ReportManifest, out_dir: Path) -> Path:
         cue_count=manifest.source.cue_count,
         generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         source_filename=manifest.source.filename,
+        labels=profile.labels,
+        content_type=profile.content_type.value,
     )
 
     destination = out_dir / "report.html"

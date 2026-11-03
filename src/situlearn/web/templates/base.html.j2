@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
   <link rel="manifest" href="/r/{{ report.slug }}/manifest.webmanifest">
 </head>
-<body class="page-{{ page }}" data-report-slug="{{ report.slug }}">
+<body class="page-{{ page }}" data-report-slug="{{ report.slug }}"{% if report.content_type.value == "movie" %} data-this-section="{{ report.labels.this_section }}" data-prev-label="{{ report.labels.previous_section }}" data-next-label="{{ report.labels.next_section }}"{% endif %}>
   <a class="skip-link" href="#main">跳到正文</a>
   <header class="site-header">
     <a class="brand" href="/r/{{ report.slug }}">情景学习</a>

@@ -17,6 +17,7 @@ from situlearn.audio import (
     synthesize_term,
 )
 from situlearn.chains import extract_terms, plan_narrative, repair_narrative_chinese
+from situlearn.content import ContentProfile, profile_for, validate_narrative
 from situlearn.dictionary import DictionaryClient, DictionaryEntry
 from situlearn.gloss import gloss_terms
 from situlearn.human_audio import HumanAudio, resolve_human_audio
@@ -24,6 +25,7 @@ from situlearn.knowledge import (
     AudioAsset,
     AudioSource,
     AudioStatus,
+    ContentType,
     NarrativeScript,
     ReportManifest,
     SourceInfo,
@@ -38,7 +40,6 @@ from situlearn.segmenter import segment_cues
 from situlearn.srt import parse_srt
 from situlearn.tts import XiaomiTTS
 
-PROMPT_VERSION = "v2"
 DEFAULT_CACHE_ROOT = Path.home() / ".cache" / "situlearn"
 
 
@@ -87,18 +88,32 @@ def _load_or_create_narrative(
     cache_path: Path,
     *,
     force: bool,
+    profile: ContentProfile,
+    source_name: str | None = None,
 ) -> NarrativeScript:
     script = None
+    cache_hit = False
     if cache_path.exists() and not force:
         try:
-            script = NarrativeScript.model_validate_json(cache_path.read_text(encoding="utf-8"))
+            cached = NarrativeScript.model_validate_json(
+                cache_path.read_text(encoding="utf-8")
+            )
+            validate_narrative(cached, profile)
+            script = cached
+            cache_hit = True
         except (OSError, ValueError):
             script = None
     if script is None:
-        script = plan_narrative(llm, segments)
+        script = plan_narrative(
+            llm,
+            segments,
+            profile=profile,
+            source_name=source_name,
+        )
 
-    repaired = repair_narrative_chinese(llm, script)
-    if repaired != script or not cache_path.exists():
+    repaired = repair_narrative_chinese(llm, script, profile=profile)
+    validate_narrative(repaired, profile)
+    if not cache_hit or repaired != script:
         cache_path.write_text(repaired.model_dump_json(indent=2), encoding="utf-8")
     return repaired
 
@@ -110,6 +125,7 @@ def _load_or_create_terms(
     cache_path: Path,
     *,
     force: bool,
+    profile: ContentProfile,
 ) -> list[TermCandidate]:
     if cache_path.exists() and not force:
         payload = _read_json(cache_path)
@@ -118,7 +134,7 @@ def _load_or_create_terms(
                 return [TermCandidate.model_validate(item) for item in payload]
             except (TypeError, ValueError):
                 pass
-    terms = extract_terms(llm, segments, script)
+    terms = extract_terms(llm, segments, script, profile=profile)
     cache_path.write_text(
         json.dumps([term.model_dump(mode="json") for term in terms], ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -167,7 +183,15 @@ def _load_or_create_dictionary(
     return mapping
 
 
-def _load_or_create_gloss(llm, candidates, dictionary, cache_path: Path, *, force: bool) -> list[TermEntry]:
+def _load_or_create_gloss(
+    llm,
+    candidates,
+    dictionary,
+    cache_path: Path,
+    *,
+    force: bool,
+    profile: ContentProfile,
+) -> list[TermEntry]:
     if cache_path.exists() and not force:
         payload = _read_json(cache_path)
         if isinstance(payload, list):
@@ -175,7 +199,7 @@ def _load_or_create_gloss(llm, candidates, dictionary, cache_path: Path, *, forc
                 return [TermEntry.model_validate(item) for item in payload]
             except (TypeError, ValueError):
                 pass
-    terms = gloss_terms(llm, candidates, dictionary)
+    terms = gloss_terms(llm, candidates, dictionary, profile=profile)
     cache_path.write_text(
         json.dumps(
             [term.model_dump(mode="json") for term in terms],
@@ -206,8 +230,9 @@ def build_report(
     out_dir: Path,
     *,
     voice: str = "冰糖",
-    terms_min: int = 30,
-    terms_max: int = 80,
+    content_type: ContentType | str = ContentType.DOCUMENTARY,
+    terms_min: int | None = None,
+    terms_max: int | None = None,
     no_audio: bool = False,
     force: bool = False,
     cache_root: Path | None = None,
@@ -215,6 +240,9 @@ def build_report(
 ) -> BuildResult:
     started = time.time()
     progress = progress or Progress()
+    profile = profile_for(content_type)
+    terms_min = profile.terms_min if terms_min is None else terms_min
+    terms_max = profile.terms_max if terms_max is None else terms_max
     input_path = input_path.expanduser().resolve()
     out_dir = out_dir.expanduser().resolve()
     warnings: list[str] = []
@@ -225,20 +253,27 @@ def build_report(
     progress.stage(f"内容切分：{len(segments)} 个片段")
     input_sha = _sha256_file(input_path)
     cache_base = cache_root or DEFAULT_CACHE_ROOT
-    run_cache = cache_base / input_sha[:16]
+    run_cache = cache_base / f"{input_sha[:16]}{profile.cache_suffix}"
     run_cache.mkdir(parents=True, exist_ok=True)
-    progress.stage(f"缓存目录：{cache_base}")
+    progress.stage(f"缓存目录：{run_cache}")
 
     llm = make_chat_model()
-    narrative_path = run_cache / f"narrative-{PROMPT_VERSION}.json"
+    narrative_path = run_cache / f"narrative-{profile.prompt_version}.json"
     progress.stage(
-        "叙事脉络：命中缓存"
+        f"{profile.labels.progress_narrative}：命中缓存"
         if narrative_path.exists() and not force
-        else "叙事脉络：调用 LLM 生成（首次约 1-2 分钟）"
+        else f"{profile.labels.progress_narrative}：调用 LLM 生成（首次约 1-2 分钟）"
     )
-    script = _load_or_create_narrative(llm, segments, narrative_path, force=force)
+    script = _load_or_create_narrative(
+        llm,
+        segments,
+        narrative_path,
+        force=force,
+        profile=profile,
+        source_name=input_path.name,
+    )
 
-    terms_path = run_cache / f"terms-{PROMPT_VERSION}.json"
+    terms_path = run_cache / f"terms-{profile.prompt_version}.json"
     progress.stage(
         "术语提取：命中缓存"
         if terms_path.exists() and not force
@@ -250,6 +285,7 @@ def build_report(
         script,
         terms_path,
         force=force,
+        profile=profile,
     )
 
     if not terms_min <= len(candidates) <= terms_max:
@@ -263,7 +299,7 @@ def build_report(
     )
     dictionary = _load_or_create_dictionary(candidates, dictionary_path, force=force)
 
-    gloss_path = run_cache / f"gloss-{PROMPT_VERSION}.json"
+    gloss_path = run_cache / f"gloss-{profile.prompt_version}.json"
     progress.stage(
         "释义生成：命中缓存"
         if gloss_path.exists() and not force
@@ -275,6 +311,7 @@ def build_report(
         dictionary,
         gloss_path,
         force=force,
+        profile=profile,
     )
     if not terms:
         raise RuntimeError("gloss stage returned no terms")
@@ -307,11 +344,19 @@ def build_report(
         )
         progress.finish()
 
-        progress.stage(f"章节音频：{len(script.sections)} 段")
+        progress.stage(
+            f"{profile.labels.progress_section_audio}：{len(script.sections)} 段"
+        )
         for index, section in enumerate(script.sections, start=1):
-            progress.counter("章节音频", index, len(script.sections))
+            progress.counter(profile.labels.progress_section_audio, index, len(script.sections))
             refs, status = synthesize_section(
-                tts, cache, limiter, section, assets_dir, voice=voice
+                tts,
+                cache,
+                limiter,
+                section,
+                assets_dir,
+                voice=voice,
+                style=profile.tts_style,
             )
             section.audio_refs = refs
             section.audio_status = status
@@ -346,7 +391,15 @@ def build_report(
                 assets.append(_asset_for(term.audio_ref, term.term, AudioSource.DICTIONARY))
                 continue
 
-            ref = synthesize_term(tts, cache, limiter, term, assets_dir, voice=voice)
+            ref = synthesize_term(
+                tts,
+                cache,
+                limiter,
+                term,
+                assets_dir,
+                voice=voice,
+                style=profile.tts_style,
+            )
             term.audio_ref = ref
             term.audio_source = (
                 AudioSource.TTS if ref != "unavailable" else AudioSource.UNAVAILABLE
@@ -365,6 +418,20 @@ def build_report(
                 if path.name not in referenced:
                     path.unlink()
 
+    config: dict[str, object] = {
+        "llm_framework": "langchain",
+        "llm_provider": "deepseek",
+        "llm_model": "deepseek-flash",
+        "narrative_language": "zh",
+        "tts_model": "mimo-v2.5-tts",
+        "tts_voice": voice,
+        "prompt_version": profile.prompt_version,
+        "langchain_version": _package_version("langchain"),
+        "langchain_deepseek_version": _package_version("langchain-deepseek"),
+    }
+    if profile.content_type is not ContentType.DOCUMENTARY:
+        config["content_type"] = profile.content_type.value
+
     manifest = ReportManifest(
         schema_version="1.0.0",
         source=SourceInfo(
@@ -373,17 +440,7 @@ def build_report(
             duration_ms=max(cue.end_ms for cue in cues) - min(cue.start_ms for cue in cues),
             cue_count=len(cues),
         ),
-        config={
-            "llm_framework": "langchain",
-            "llm_provider": "deepseek",
-            "llm_model": "deepseek-flash",
-            "narrative_language": "zh",
-            "tts_model": "mimo-v2.5-tts",
-            "tts_voice": voice,
-            "prompt_version": PROMPT_VERSION,
-            "langchain_version": _package_version("langchain"),
-            "langchain_deepseek_version": _package_version("langchain-deepseek"),
-        },
+        config=config,
         narrative=script,
         terms=terms,
         assets=assets,

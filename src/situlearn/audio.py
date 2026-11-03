@@ -30,8 +30,17 @@ class AudioCache:
         self.root.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
-    def key(text: str, *, model: str, voice: str, fmt: str) -> str:
+    def key(
+        text: str,
+        *,
+        model: str,
+        voice: str,
+        fmt: str,
+        style: str | None = None,
+    ) -> str:
         payload = f"{model}:{voice}:{fmt}:{text}"
+        if style is not None:
+            payload = f"{model}:{voice}:{fmt}:{style}:{text}"
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def path_for(self, key: str, fmt: str) -> Path:
@@ -56,14 +65,18 @@ def synthesize_text(
     text: str,
     *,
     voice: str,
+    style: str | None = None,
     fmt: str = "mp3",
 ) -> Path:
-    key = cache.key(text, model=tts.model, voice=voice, fmt=fmt)
+    key = cache.key(text, model=tts.model, voice=voice, fmt=fmt, style=style)
     cached = cache.get(key, fmt)
     if cached is not None:
         return cached
     limiter.wait()
-    data = tts.synthesize(text, voice=voice, fmt=fmt)
+    if style is None:
+        data = tts.synthesize(text, voice=voice, fmt=fmt)
+    else:
+        data = tts.synthesize(text, voice=voice, fmt=fmt, style=style)
     return cache.put(key, fmt, data)
 
 
@@ -83,6 +96,7 @@ def synthesize_section(
     assets_dir: Path,
     *,
     voice: str,
+    style: str | None = None,
     max_chars: int = 3_000,
     fmt: str = "mp3",
 ) -> tuple[list[str], AudioStatus]:
@@ -93,7 +107,9 @@ def synthesize_section(
     refs: list[str] = []
     for ordinal, chunk in enumerate(chunks, start=1):
         try:
-            cached = synthesize_text(tts, cache, limiter, chunk, voice=voice, fmt=fmt)
+            cached = synthesize_text(
+                tts, cache, limiter, chunk, voice=voice, style=style, fmt=fmt
+            )
         except TTSError:
             return refs, AudioStatus.PARTIAL if refs else AudioStatus.UNAVAILABLE
         refs.append(export_audio(cached, assets_dir, f"{section.section_id}-{ordinal:02d}"))
@@ -109,10 +125,13 @@ def synthesize_term(
     assets_dir: Path,
     *,
     voice: str,
+    style: str | None = None,
     fmt: str = "mp3",
 ) -> str:
     try:
-        cached = synthesize_text(tts, cache, limiter, term.term, voice=voice, fmt=fmt)
+        cached = synthesize_text(
+            tts, cache, limiter, term.term, voice=voice, style=style, fmt=fmt
+        )
     except TTSError:
         return "unavailable"
     slug = hashlib.sha256(term.term.casefold().encode("utf-8")).hexdigest()[:12]

@@ -59,9 +59,17 @@
     const inner = document.createElement("div");
     inner.className = "player-inner";
 
-    previousButton = controlButton("player-prev", "上一章", "⏮");
+    previousButton = controlButton(
+      "player-prev",
+      document.body.dataset.prevLabel || "上一章",
+      "⏮"
+    );
     toggleButton = controlButton("player-toggle", "播放或暂停", "▶");
-    nextButton = controlButton("player-next", "下一章", "⏭");
+    nextButton = controlButton(
+      "player-next",
+      document.body.dataset.nextLabel || "下一章",
+      "⏭"
+    );
 
     const main = document.createElement("div");
     main.className = "player-main";
@@ -281,7 +289,7 @@
     resumePrompt.setAttribute("role", "status");
 
     const text = document.createElement("span");
-    text.textContent = `上次听到「${button.dataset.label || "本节"}」`;
+    text.textContent = `上次听到「${button.dataset.label || document.body.dataset.thisSection || "本节"}」`;
     const resume = controlButton("resume-continue", "继续上次播放", "继续");
     const dismiss = controlButton("resume-dismiss", "关闭提示", "忽略");
     resume.addEventListener("click", () => {

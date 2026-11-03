@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from situlearn import __version__
+from situlearn.knowledge import ContentType
 from situlearn.pipeline import build_report
 from situlearn.progress import Progress
 from situlearn.publish import PublishError, publish_report_dir
@@ -22,8 +23,14 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("input", help="path to a single-language English .srt file")
     build.add_argument("--out", required=True, help="output directory")
     build.add_argument("--no-audio", action="store_true", help="skip TTS generation")
-    build.add_argument("--terms-min", type=int, default=30)
-    build.add_argument("--terms-max", type=int, default=80)
+    build.add_argument(
+        "--content-type",
+        choices=[content_type.value for content_type in ContentType],
+        default=ContentType.DOCUMENTARY.value,
+        help="content type: documentary (default) or movie",
+    )
+    build.add_argument("--terms-min", type=int, default=None)
+    build.add_argument("--terms-max", type=int, default=None)
     build.add_argument("--voice", default="冰糖")
     build.add_argument("--force", action="store_true", help="ignore caches")
 
@@ -84,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.input),
             Path(args.out),
             voice=args.voice,
+            content_type=args.content_type,
             terms_min=args.terms_min,
             terms_max=args.terms_max,
             no_audio=args.no_audio,

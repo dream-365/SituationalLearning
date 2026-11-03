@@ -16,7 +16,11 @@ from situlearn.knowledge import (
 from situlearn.report import assemble_report
 
 
-def _manifest() -> ReportManifest:
+def _manifest(
+    *,
+    section_count: int = 4,
+    config: dict[str, object] | None = None,
+) -> ReportManifest:
     sections = [
         NarrativeSection(
             section_id=f"sec-{index:02d}",
@@ -28,7 +32,7 @@ def _manifest() -> ReportManifest:
             audio_refs=[f"assets/audio/sec-{index:02d}.mp3"],
             audio_status=AudioStatus.READY,
         )
-        for index in range(1, 5)
+        for index in range(1, section_count + 1)
     ]
     term = TermEntry(
         term="cherub",
@@ -52,7 +56,7 @@ def _manifest() -> ReportManifest:
             duration_ms=240_000,
             cue_count=1_186,
         ),
-        config={"llm_model": "deepseek-flash"},
+        config=config or {"llm_model": "deepseek-flash"},
         narrative=NarrativeScript(
             title="测试报告",
             logline="这是一句话简介，用来测试整份报告能否正确渲染。",
@@ -74,3 +78,28 @@ def test_assemble_report_writes_offline_html(tmp_path: Path) -> None:
     assert "cherub" in html
     assert "assets/audio/sec-01.mp3" in html
     assert "default-src 'self'" in html
+
+
+def test_assemble_report_movie_uses_plot_labels(tmp_path: Path) -> None:
+    path = assemble_report(
+        _manifest(section_count=6, config={"content_type": "movie"}),
+        tmp_path,
+    )
+
+    html = path.read_text(encoding="utf-8")
+    assert "剧情脉络" in html
+    assert "电影学习报告" in html
+    assert "播放全部剧情" in html
+    assert "全部场景" in html
+    assert "回到本场" in html
+    assert "内容脉络" not in html
+
+
+def test_assemble_report_legacy_manifest_defaults_to_documentary(
+    tmp_path: Path,
+) -> None:
+    path = assemble_report(_manifest(), tmp_path)
+
+    html = path.read_text(encoding="utf-8")
+    assert "内容脉络" in html
+    assert "剧情脉络" not in html

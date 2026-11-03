@@ -192,23 +192,23 @@
   }
 </style>
 </head>
-<body>
+<body{% if content_type == "movie" %} data-this-section="{{ labels.this_section }}"{% endif %}>
 <div class="wrap">
   <header class="hero">
-    <p class="eyebrow">情景学习 · 字幕学习报告</p>
+    <p class="eyebrow">{{ labels.report_eyebrow }}</p>
     <h1>{{ title }}</h1>
     <p class="logline">{{ logline }}</p>
     <p class="meta">片长 {{ duration_min }} 分钟 · {{ cue_count }} 条字幕 · 生成于 {{ generated_at }}</p>
     <div class="hero-controls">
-      <button id="play-all" type="button">播放全部脉络</button>
+      <button id="play-all" type="button">{{ labels.play_all }}</button>
       <button id="stop-all" class="ghost" type="button">停止</button>
     </div>
   </header>
 
   <main>
     <section id="narrative">
-      <h2>内容脉络</h2>
-      <p class="section-lead">先听一遍片子怎么走，再回头对着下面的生词本看。</p>
+      <h2>{{ labels.narrative_heading }}</h2>
+      <p class="section-lead">{{ labels.narrative_lead }}</p>
       <div class="background">{{ background }}</div>
       <ol class="timeline">
         {% for s in sections %}
@@ -217,12 +217,12 @@
             <span class="time">{{ s.start }} – {{ s.end }}</span>
             <h3>{{ s.heading }}</h3>
             <button class="play" type="button" data-srcs='{{ s.audio_refs | tojson }}' data-label="{{ s.heading }}" {% if not s.audio_refs %}disabled{% endif %}>
-              {% if s.audio_refs %}播放本节{% else %}暂无音频{% endif %}
+              {% if s.audio_refs %}{{ labels.play_section }}{% else %}{{ labels.no_audio }}{% endif %}
             </button>
           </div>
           <p class="summary">{{ s.summary }}</p>
           <details>
-            <summary>展开播报稿</summary>
+            <summary>{{ labels.expand_script }}</summary>
             <p class="spoken">{{ s.spoken_text }}</p>
           </details>
           {% if s.key_terms %}
@@ -237,10 +237,10 @@
 
     <section id="vocab" style="margin-top:48px">
       <h2>生词本</h2>
-      <p class="section-lead">专业术语和专名优先，也可以按章节筛选，回到它出现的语境。</p>
+      <p class="section-lead">{{ labels.vocab_lead }}</p>
       <div class="filters">
         <select id="filter-section">
-          <option value="">全部章节</option>
+          <option value="">{{ labels.all_sections }}</option>
           {% for s in sections %}<option value="{{ s.section_id }}">{{ s.heading }}</option>{% endfor %}
         </select>
         <select id="filter-category">
@@ -268,7 +268,7 @@
           <p class="why">{{ t.why_it_matters }}</p>
           <div class="term-meta">
             <span class="badge">{{ t.category_label }}</span>
-            <a href="#{{ t.section_id }}">回到本节</a>
+            <a href="#{{ t.section_id }}">{{ labels.back_to_section }}</a>
           </div>
         </article>
         {% endfor %}
@@ -364,7 +364,7 @@
 
   function sectionItems(button) {
     const srcs = JSON.parse(button.dataset.srcs || '[]');
-    const label = button.dataset.label || '本节';
+    const label = button.dataset.label || {% if content_type == "movie" %}document.body.dataset.thisSection || {% endif %}'本节';
     return srcs.map((src) => ({ src, label }));
   }
 

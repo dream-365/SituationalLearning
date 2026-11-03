@@ -29,6 +29,8 @@
 
 > 关键点：**只要 `SITULEARN_DATA_DIR` 指向上面那个数据目录，重复发布就会命中同一条报告，slug 和 URL 都不变。** 换数据目录会生成新 slug，旧 URL 随即失效。
 
+> 内容类型：纪录片默认构建；电影用 `uv run situlearn build <movie.srt> --content-type movie --out reports/<name>-movie`。发布键只取字幕 SHA-256，因此同一份字幕先发纪录片再发电影会覆盖同一个 slug/URL，最后一次发布生效。需要同时保留两版时，请使用不同字幕文件或等待后续复合发布键支持。
+
 ---
 
 ## 1. 发布前检查清单
