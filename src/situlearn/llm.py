@@ -22,7 +22,7 @@ class LLMConfigError(RuntimeError):
 
 
 def make_chat_model(
-    model: str | None = None, *, max_tokens: int = 32_000
+    model: str | None = None, *, max_tokens: int = 64_000
 ) -> ChatDeepSeek:
     """Build a ChatDeepSeek client from environment variables."""
 

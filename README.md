@@ -28,12 +28,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Install the released CLI:
 
 ```bash
-uv tool install --python 3.12 https://github.com/dream-365/SituationalLearning/releases/download/v0.1.3/situlearn-0.1.3-py3-none-any.whl
+uv tool install --python 3.12 https://github.com/dream-365/SituationalLearning/releases/download/v0.2.2/situlearn-0.2.2-py3-none-any.whl
 ```
 
 If PyPI is slow, set `HTTPS_PROXY` to your local proxy before installing.
 
-The published wheel currently tracks v0.1.3. The web publishing layer and the `publish` subcommand are available from source and will ship in the v0.2.0 release.
+The published wheel tracks v0.2.2 and includes the `publish` subcommand and the `--content-type movie` option.
 
 ## Environment
 

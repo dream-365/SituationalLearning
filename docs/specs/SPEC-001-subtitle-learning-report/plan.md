@@ -49,7 +49,7 @@ updated_at: 2026-11-02
 - 模型元数据：`DeepSeek-V4.1-Flash`，上下文 1,048,576 tokens，最大输出 393,216 tokens，effort 默认 `high`。
 - `with_structured_output` 默认 tool_choice 在 thinking mode 下返回 400：`Thinking mode does not support this tool_choice`。
 - 改用 `method="json_mode"` 后，嵌套 Pydantic 模型解析成功。
-- 实现约束：所有 LLM Chain 统一走 JSON mode + Pydantic 校验，`max_tokens` 设为 32,000。
+- 实现约束：所有 LLM Chain 统一走 JSON mode + Pydantic 校验，`max_tokens` 设为 64,000。32,000 在 2 小时 40 分钟电影字幕上会被 thinking tokens 吃满（实测 reasoning 28,456 + 截断输出），导致 JSON 解析失败；模型最大输出为 393,216，64,000 留足余量。
 
 ## 3. 里程碑
 
