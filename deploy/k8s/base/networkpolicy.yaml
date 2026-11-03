@@ -29,3 +29,10 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # OSS internal endpoint (Aliyun VPC address range).
+    - to:
+        - ipBlock:
+            cidr: 100.64.0.0/10
+      ports:
+        - protocol: TCP
+          port: 443

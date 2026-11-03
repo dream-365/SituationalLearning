@@ -5,9 +5,10 @@ namespace: situlearn
 resources:
   - namespace.yaml
   - configmap.yaml
-  - secret.yaml
+  # secret.yaml is intentionally not applied: create situlearn-secrets out of
+  # band (see docs/runbooks/publish-report.md) so a placeholder token never
+  # overwrites the real one.
   - pvc-data.yaml
-  - pvc-backup.yaml
   - deployment.yaml
   - service.yaml
   - ingress.yaml

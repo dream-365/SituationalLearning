@@ -25,7 +25,7 @@ spec:
         fsGroup: 10001
       containers:
         - name: web
-          image: situlearn-web:0.2.0
+          image: situlearn-web:0.2.2
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -39,10 +39,22 @@ spec:
                 secretKeyRef:
                   name: situlearn-secrets
                   key: PUBLISH_TOKEN
+            - name: OSS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: situlearn-secrets
+                  key: OSS_ACCESS_KEY_ID
+            - name: OSS_ACCESS_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: situlearn-secrets
+                  key: OSS_ACCESS_KEY_SECRET
             - name: SITULEARN_DATA_DIR
               value: /data
             - name: SITULEARN_BACKUP_DIR
               value: /backup
+            - name: SITULEARN_STAGING_DIR
+              value: /staging
           livenessProbe:
             httpGet:
               path: /healthz
@@ -71,16 +83,16 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
-            - name: backup
-              mountPath: /backup
+            - name: staging
+              mountPath: /staging
             - name: tmp
               mountPath: /tmp
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: situlearn-data
-        - name: backup
-          persistentVolumeClaim:
-            claimName: situlearn-backup
+        - name: staging
+          emptyDir:
+            sizeLimit: 1Gi
         - name: tmp
           emptyDir: {}

@@ -8,6 +8,12 @@ __pycache__/
 reports/
 samples/*.srt
 .env
+deploy/.env
+deploy/.env.*
+!deploy/.env.example
+deploy/k8s/overlays/local/
+*.pem
+*.key
 .DS_Store
 *.mp3
 *.wav
