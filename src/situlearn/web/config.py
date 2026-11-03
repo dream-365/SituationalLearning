@@ -65,6 +65,14 @@ class Settings:
     db_busy_timeout_ms: int = 5_000
     log_level: str = "info"
     sentry_dsn: str | None = None
+    oss_bucket: str = ""
+    oss_endpoint: str = ""
+    oss_prefix: str = "situlearn/"
+    oss_access_key_id: str = ""
+    oss_access_key_secret: str = ""
+    oss_connect_timeout_ms: int = 3_000
+    oss_read_cache_ttl_s: int = 60
+    _staging_dir: Path | None = field(default=None, repr=False)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -87,6 +95,18 @@ class Settings:
             db_busy_timeout_ms=_env_int(source, "DB_BUSY_TIMEOUT_MS", 5_000),
             log_level=source.get("LOG_LEVEL", "info").lower(),
             sentry_dsn=(source.get("SENTRY_DSN") or None),
+            oss_bucket=source.get("OSS_BUCKET", ""),
+            oss_endpoint=source.get("OSS_ENDPOINT", ""),
+            oss_prefix=source.get("OSS_PREFIX", "situlearn/"),
+            oss_access_key_id=source.get("OSS_ACCESS_KEY_ID", ""),
+            oss_access_key_secret=source.get("OSS_ACCESS_KEY_SECRET", ""),
+            oss_connect_timeout_ms=_env_int(source, "OSS_CONNECT_TIMEOUT_MS", 3_000),
+            oss_read_cache_ttl_s=_env_int(source, "OSS_READ_CACHE_TTL_S", 60),
+            _staging_dir=(
+                Path(source["SITULEARN_STAGING_DIR"]).expanduser()
+                if source.get("SITULEARN_STAGING_DIR")
+                else None
+            ),
         )
 
     @property
@@ -99,7 +119,21 @@ class Settings:
 
     @property
     def staging_dir(self) -> Path:
-        return self.data_dir / "staging"
+        return self._staging_dir if self._staging_dir is not None else self.data_dir / "staging"
+
+    @property
+    def object_prefix(self) -> str:
+        prefix = self.oss_prefix.strip("/")
+        return f"{prefix}/" if prefix else ""
+
+    @property
+    def oss_configured(self) -> bool:
+        return bool(
+            self.oss_bucket
+            and self.oss_endpoint
+            and self.oss_access_key_id
+            and self.oss_access_key_secret
+        )
 
     @property
     def trash_dir(self) -> Path:

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM ghcr.io/astral-sh/uv:0.11.6 AS builder
+FROM ghcr.io/astral-sh/uv:0.11.6-python3.12-trixie-slim AS builder
 
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \

@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import sqlite3
 import tarfile
+import tempfile
 import time
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+
+from situlearn.web.config import Settings
+from situlearn.web.objectstore import build_object_store
 
 
 def _prune(backup_dir: Path, keep_days: int, *, now: float | None = None) -> None:
@@ -44,22 +50,75 @@ def create_backup(
     return archive
 
 
+def create_oss_backup(
+    settings: Settings,
+    *,
+    keep_days: int = 30,
+    now: float | None = None,
+) -> str:
+    """Upload a consistent SQLite snapshot to the configured object store."""
+
+    database = settings.db_path
+    if not database.is_file():
+        raise FileNotFoundError(f"database not found: {database}")
+
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    prefix = f"{settings.object_prefix}backups/"
+    key = f"{prefix}situlearn-{stamp}.sqlite3"
+    with tempfile.TemporaryDirectory() as temporary:
+        snapshot = Path(temporary) / f"situlearn-{stamp}.sqlite3"
+        source = sqlite3.connect(database)
+        target = sqlite3.connect(snapshot)
+        try:
+            source.backup(target)
+        finally:
+            target.close()
+            source.close()
+        build_object_store(settings).put_file(key, snapshot)
+
+    store = build_object_store(settings)
+    cutoff = (time.time() if now is None else now) - keep_days * 86_400
+    for existing in store.list_keys(prefix):
+        name = existing.rsplit("/", 1)[-1]
+        try:
+            created = datetime.strptime(name, "situlearn-%Y%m%dT%H%M%SZ.sqlite3")
+        except ValueError:
+            continue
+        if created.replace(tzinfo=UTC).timestamp() < cutoff:
+            store.delete_key(existing)
+    return key
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Back up the SituLearn data directory")
-    parser.add_argument("--data-dir", default="/data")
-    parser.add_argument("--backup-dir", default="/backup")
-    parser.add_argument("--keep-days", type=int, default=7)
+    parser.add_argument("--data-dir", default=None)
+    parser.add_argument("--backup-dir", default=None)
+    parser.add_argument("--keep-days", type=int, default=None)
     args = parser.parse_args(argv)
+
+    settings = Settings.from_env()
+    if args.data_dir:
+        settings = replace(settings, data_dir=Path(args.data_dir))
+    if args.backup_dir:
+        settings = replace(settings, backup_dir=Path(args.backup_dir))
     try:
-        archive = create_backup(
-            Path(args.data_dir),
-            Path(args.backup_dir),
-            keep_days=args.keep_days,
-        )
-    except (OSError, tarfile.TarError) as exc:
+        if settings.oss_configured:
+            print(
+                create_oss_backup(
+                    settings, keep_days=args.keep_days if args.keep_days is not None else 30
+                )
+            )
+        else:
+            print(
+                create_backup(
+                    settings.data_dir,
+                    settings.backup_dir,
+                    keep_days=args.keep_days if args.keep_days is not None else 7,
+                )
+            )
+    except (OSError, tarfile.TarError, sqlite3.Error) as exc:
         print(f"situlearn-backup: {exc}")
         return 1
-    print(archive)
     return 0
 
 

@@ -43,7 +43,10 @@ def test_readyz_creates_data_directories(tmp_path):
         response = client.get("/readyz")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "checks": {"data_dir": "ok"}}
+    assert response.json() == {
+        "status": "ok",
+        "checks": {"data_dir": "ok", "object_store": "ok"},
+    }
     assert settings.reports_dir.is_dir()
     assert settings.staging_dir.is_dir()
     assert settings.trash_dir.is_dir()

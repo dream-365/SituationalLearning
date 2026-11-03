@@ -10,9 +10,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
 
 from situlearn.web.auth import hash_client_ip, require_publish_token
 from situlearn.web.config import Settings
+from situlearn.web.objectstore import ObjectStoreError
 from situlearn.web.observability import get_request_id
 from situlearn.web.repository import (
     PublishConflict,
@@ -35,6 +37,7 @@ _VALIDATION_STATUS = {
     "ERR_PUBLISH_ASSET_MISSING": 422,
     "ERR_PUBLISH_CONFLICT": 409,
     "ERR_PUBLISH_STORAGE_FULL": 507,
+    "ERR_STORAGE_UNAVAILABLE": 503,
 }
 
 
@@ -155,7 +158,9 @@ async def publish_report(
     archive_path: Path | None = None
     try:
         archive_path = await _save_upload(archive, settings)
-        staged = store.stage(archive_path, report_key=report_key)
+        staged = await run_in_threadpool(
+            store.stage, archive_path, report_key=report_key
+        )
     except PublishValidationError as exc:
         request.app.state.metrics.record_publish("rejected")
         repository.record_event(
@@ -167,13 +172,26 @@ async def publish_report(
             error_code=exc.code,
         )
         raise _validation_error(exc) from exc
+    except ObjectStoreError as exc:
+        request.app.state.metrics.record_publish("failed")
+        repository.record_event(
+            report_id=existing.report_id if existing else None,
+            request_id=request_id,
+            action="publish",
+            result="failed",
+            client_ip_hash=ip_hash,
+            error_code="ERR_STORAGE_UNAVAILABLE",
+        )
+        raise _error(503, "ERR_STORAGE_UNAVAILABLE", str(exc)) from exc
     finally:
         if archive_path is not None:
             archive_path.unlink(missing_ok=True)
 
     version = _new_version()
     try:
-        installed = store.install(staged, report_id=report_id, version=version)
+        installed = await run_in_threadpool(
+            store.install, staged, report_id=report_id, version=version
+        )
     except PublishValidationError as exc:
         store.abort(staged)
         request.app.state.metrics.record_publish("rejected")
@@ -186,13 +204,25 @@ async def publish_report(
             error_code=exc.code,
         )
         raise _validation_error(exc) from exc
+    except ObjectStoreError as exc:
+        store.abort(staged)
+        request.app.state.metrics.record_publish("failed")
+        repository.record_event(
+            report_id=existing.report_id if existing else None,
+            request_id=request_id,
+            action="publish",
+            result="failed",
+            client_ip_hash=ip_hash,
+            error_code="ERR_STORAGE_UNAVAILABLE",
+        )
+        raise _error(503, "ERR_STORAGE_UNAVAILABLE", str(exc)) from exc
 
     try:
         record = repository.finish_publish(
             report_key=report_key,
             title=staged.title,
             version=version,
-            dir_path=installed.dir_path,
+            object_prefix=installed.object_prefix,
             manifest_sha256=staged.manifest_sha256,
             size_bytes=staged.size_bytes,
             schema_version=staged.schema_version,

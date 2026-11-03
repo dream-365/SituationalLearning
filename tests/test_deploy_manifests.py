@@ -49,11 +49,8 @@ def test_base_contains_required_resources():
         for document in _documents()
         if document.get("kind") == "PersistentVolumeClaim"
     ]
-    assert len(pvcs) == 2
-    assert {pvc["metadata"]["name"] for pvc in pvcs} == {
-        "situlearn-data",
-        "situlearn-backup",
-    }
+    assert len(pvcs) == 1
+    assert {pvc["metadata"]["name"] for pvc in pvcs} == {"situlearn-data"}
 
 
 def test_deployment_has_probes_resources_and_storage():
@@ -70,13 +67,16 @@ def test_deployment_has_probes_resources_and_storage():
     assert container["resources"]["limits"]["memory"] == "512Mi"
     assert container["securityContext"]["readOnlyRootFilesystem"] is True
     mounts = {mount["mountPath"] for mount in container["volumeMounts"]}
-    assert {"/data", "/backup", "/tmp"}.issubset(mounts)
+    assert {"/data", "/staging", "/tmp"}.issubset(mounts)
+    env = {item["name"]: item.get("value") for item in container["env"]}
+    assert env["SITULEARN_STAGING_DIR"] == "/staging"
 
     volumes = {
         volume["name"]: volume for volume in spec["template"]["spec"]["volumes"]
     }
     assert volumes["data"]["persistentVolumeClaim"]["claimName"] == "situlearn-data"
-    assert volumes["backup"]["persistentVolumeClaim"]["claimName"] == "situlearn-backup"
+    assert volumes["staging"]["emptyDir"]["sizeLimit"] == "1Gi"
+    assert "backup" not in volumes
 
 
 def test_service_ingress_and_tls():
@@ -99,18 +99,26 @@ def test_configmap_and_secret_contract():
     secret = _by_kind("Secret")
     assert "PUBLISH_TOKEN" in secret["stringData"]
     assert "replace-with" in secret["stringData"]["PUBLISH_TOKEN"]
+    assert "OSS_ACCESS_KEY_ID" in secret["stringData"]
+    assert "OSS_ACCESS_KEY_SECRET" in secret["stringData"]
 
 
-def test_backup_cronjob_mounts_both_volumes():
+def test_backup_cronjob_snapshots_database_to_oss():
     cronjob = _by_kind("CronJob")
     assert cronjob["spec"]["schedule"] == "17 3 * * *"
     assert cronjob["spec"]["concurrencyPolicy"] == "Forbid"
     container = cronjob["spec"]["jobTemplate"]["spec"]["template"]["spec"][
         "containers"
     ][0]
-    script = container["args"][0]
-    assert "tar -czf /backup/" in script
-    assert "-mtime +7 -delete" in script
+    assert container["image"] == "situlearn-web:0.2.2"
+    assert container["command"][-1] == "situlearn.web.backup"
+    assert "--keep-days" in container["args"]
+    mounts = {mount["mountPath"] for mount in container["volumeMounts"]}
+    assert "/data" in mounts
+    assert "/backup" not in mounts
+    env_sources = container["envFrom"]
+    assert any("configMapRef" in item for item in env_sources)
+    assert any("secretRef" in item for item in env_sources)
 
 
 def test_network_policy_scopes_traffic():
@@ -118,6 +126,8 @@ def test_network_policy_scopes_traffic():
     assert set(policy["spec"]["policyTypes"]) == {"Ingress", "Egress"}
     assert policy["spec"]["ingress"][0]["ports"][0]["port"] == 8000
     assert policy["spec"]["egress"][0]["ports"][0]["port"] == 53
+    assert policy["spec"]["egress"][1]["to"][0]["ipBlock"]["cidr"] == "100.64.0.0/10"
+    assert policy["spec"]["egress"][1]["ports"][0]["port"] == 443
 
 
 def test_dockerfile_runs_as_non_root_and_uses_locked_dependencies():
@@ -133,7 +143,7 @@ def test_overlay_pins_image_tag_and_host():
     overlay = yaml.safe_load(
         (OVERLAY / "kustomization.yaml").read_text(encoding="utf-8")
     )
-    assert overlay["images"][0]["newTag"] == "0.2.0"
+    assert overlay["images"][0]["newTag"] == "0.2.2"
     assert overlay["namespace"] == "situlearn"
     patch_text = "\n".join(item["patch"] for item in overlay["patches"])
     assert "situlearn.example.com" in patch_text

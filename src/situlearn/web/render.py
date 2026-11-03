@@ -9,6 +9,7 @@ from pathlib import Path, PurePosixPath
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from situlearn.knowledge import ReportManifest
+from situlearn.web.objectstore import ObjectStoreError
 from situlearn.web.repository import ReportRecord, ReportRepository
 from situlearn.web.storage import ReportStore
 
@@ -36,7 +37,7 @@ class SectionNotFound(LookupError):
 @dataclass(frozen=True)
 class PublicReport:
     record: ReportRecord
-    version_dir: Path
+    version_prefix: str
     title: str
     logline: str
     background: str
@@ -132,20 +133,19 @@ def load_public_report(
         raise ReportNotFound(slug)
     if bundle.report.status != "published":
         raise ReportGone(slug)
-    version_dir = store.resolve(bundle.version.dir_path)
-    manifest_path = version_dir / "manifest.json"
+    version_prefix = bundle.version.object_prefix
     try:
         manifest = ReportManifest.model_validate_json(
-            manifest_path.read_text(encoding="utf-8")
+            store.read_manifest(version_prefix).decode("utf-8")
         )
-    except (OSError, ValueError) as exc:
+    except (ObjectStoreError, UnicodeDecodeError, ValueError) as exc:
         raise ReportNotFound(slug) from exc
 
     sections = _build_sections(manifest, slug)
     terms = _build_terms(manifest, slug, sections)
     return PublicReport(
         record=bundle.report,
-        version_dir=version_dir,
+        version_prefix=version_prefix,
         title=manifest.narrative.title,
         logline=manifest.narrative.logline,
         background=manifest.narrative.background,

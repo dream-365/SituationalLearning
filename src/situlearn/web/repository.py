@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS reports (
 CREATE TABLE IF NOT EXISTS report_versions (
     report_id TEXT NOT NULL REFERENCES reports(report_id) ON DELETE CASCADE,
     version TEXT NOT NULL,
-    dir_path TEXT NOT NULL,
+    dir_path TEXT NOT NULL DEFAULT '',
+    object_prefix TEXT NOT NULL DEFAULT '',
     manifest_sha256 TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('active', 'superseded', 'deleted')),
     created_at TEXT NOT NULL,
@@ -79,7 +80,7 @@ class ReportRecord:
 class VersionRecord:
     report_id: str
     version: str
-    dir_path: str
+    object_prefix: str
     manifest_sha256: str
     status: str
     created_at: str
@@ -136,7 +137,7 @@ def _version_from_row(row: sqlite3.Row) -> VersionRecord:
     return VersionRecord(
         report_id=row["report_id"],
         version=row["version"],
-        dir_path=row["dir_path"],
+        object_prefix=row["object_prefix"],
         manifest_sha256=row["manifest_sha256"],
         status=row["status"],
         created_at=row["created_at"],
@@ -189,6 +190,15 @@ class ReportRepository:
         with self._connection() as connection:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.executescript(_SCHEMA)
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(report_versions)")
+            }
+            if "object_prefix" not in columns:
+                connection.execute(
+                    "ALTER TABLE report_versions "
+                    "ADD COLUMN object_prefix TEXT NOT NULL DEFAULT ''"
+                )
 
     def get_by_key(self, report_key: str) -> ReportRecord | None:
         with self._connection() as connection:
@@ -217,7 +227,7 @@ class ReportRepository:
         self, slug: str, *, include_unpublished: bool = False
     ) -> ReportBundle | None:
         query = """
-            SELECT r.*, v.version AS version, v.dir_path AS dir_path,
+            SELECT r.*, v.version AS version, v.object_prefix AS object_prefix,
                    v.manifest_sha256 AS manifest_sha256,
                    v.status AS version_status, v.created_at AS version_created_at
             FROM reports r
@@ -234,7 +244,7 @@ class ReportRepository:
         version = VersionRecord(
             report_id=row["report_id"],
             version=row["version"],
-            dir_path=row["dir_path"],
+            object_prefix=row["object_prefix"],
             manifest_sha256=row["manifest_sha256"],
             status=row["version_status"],
             created_at=row["version_created_at"],
@@ -247,7 +257,7 @@ class ReportRepository:
         report_key: str,
         title: str,
         version: str,
-        dir_path: str,
+        object_prefix: str,
         manifest_sha256: str,
         size_bytes: int,
         schema_version: str,
@@ -329,10 +339,11 @@ class ReportRepository:
                 connection.execute(
                     """
                     INSERT INTO report_versions (
-                        report_id, version, dir_path, manifest_sha256, status, created_at
-                    ) VALUES (?, ?, ?, ?, 'active', ?)
+                        report_id, version, dir_path, object_prefix,
+                        manifest_sha256, status, created_at
+                    ) VALUES (?, ?, '', ?, ?, 'active', ?)
                     """,
-                    (report_id, version, dir_path, manifest_sha256, now),
+                    (report_id, version, object_prefix, manifest_sha256, now),
                 )
             except sqlite3.IntegrityError as exc:
                 raise PublishConflict(f"version already exists: {version}") from exc

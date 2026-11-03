@@ -142,7 +142,7 @@ def test_install_and_first_publish(tmp_path):
         report_key=REPORT_KEY,
         title=staged.title,
         version="v1",
-        dir_path=version.dir_path,
+        object_prefix=version.object_prefix,
         manifest_sha256=staged.manifest_sha256,
         size_bytes=staged.size_bytes,
         schema_version=staged.schema_version,
@@ -157,8 +157,8 @@ def test_install_and_first_publish(tmp_path):
     assert len(report.slug.rsplit("-", 1)[1]) == 12
     bundle = repository.get_current_bundle(report.slug)
     assert bundle is not None
-    assert bundle.version.dir_path == version.dir_path
-    assert version.absolute_path.is_dir()
+    assert bundle.version.object_prefix == version.object_prefix
+    assert store.objects.stat(version.object_prefix + "manifest.json") > 0
 
 
 def test_republish_switches_version_and_supersedes_old(tmp_path):
@@ -174,7 +174,7 @@ def test_republish_switches_version_and_supersedes_old(tmp_path):
         report_key=REPORT_KEY,
         title=first.title,
         version="v1",
-        dir_path=first_ref.dir_path,
+        object_prefix=first_ref.object_prefix,
         manifest_sha256=first.manifest_sha256,
         size_bytes=first.size_bytes,
         schema_version=first.schema_version,
@@ -189,7 +189,7 @@ def test_republish_switches_version_and_supersedes_old(tmp_path):
         report_key=REPORT_KEY,
         title=second.title,
         version="v2",
-        dir_path=second_ref.dir_path,
+        object_prefix=second_ref.object_prefix,
         manifest_sha256=second.manifest_sha256,
         size_bytes=second.size_bytes,
         schema_version=second.schema_version,
@@ -203,8 +203,8 @@ def test_republish_switches_version_and_supersedes_old(tmp_path):
     assert second_report.current_version == "v2"
     assert repository.get_version(report_id, "v1").status == "superseded"
     assert repository.get_version(report_id, "v2").status == "active"
-    assert first_ref.absolute_path.is_dir()
-    assert second_ref.absolute_path.is_dir()
+    assert store.objects.stat(first_ref.object_prefix + "manifest.json") > 0
+    assert store.objects.stat(second_ref.object_prefix + "manifest.json") > 0
 
 
 def test_stale_expected_version_does_not_change_current(tmp_path):
@@ -220,7 +220,7 @@ def test_stale_expected_version_does_not_change_current(tmp_path):
         report_key=REPORT_KEY,
         title=staged.title,
         version="v1",
-        dir_path=version.dir_path,
+        object_prefix=version.object_prefix,
         manifest_sha256=staged.manifest_sha256,
         size_bytes=staged.size_bytes,
         schema_version=staged.schema_version,
@@ -234,7 +234,7 @@ def test_stale_expected_version_does_not_change_current(tmp_path):
             report_key=REPORT_KEY,
             title=staged.title,
             version="v2",
-            dir_path=version.dir_path,
+            object_prefix=version.object_prefix,
             manifest_sha256=staged.manifest_sha256,
             size_bytes=staged.size_bytes,
             schema_version=staged.schema_version,
@@ -258,7 +258,7 @@ def test_unpublish_hides_public_bundle_but_keeps_version(tmp_path):
         report_key=REPORT_KEY,
         title=staged.title,
         version="v1",
-        dir_path=version.dir_path,
+        object_prefix=version.object_prefix,
         manifest_sha256=staged.manifest_sha256,
         size_bytes=staged.size_bytes,
         schema_version=staged.schema_version,
@@ -277,7 +277,7 @@ def test_unpublish_hides_public_bundle_but_keeps_version(tmp_path):
     assert repository.get_by_slug(report.slug, include_unpublished=True).status == "unpublished"
     assert repository.get_current_bundle(report.slug) is None
     assert repository.get_current_bundle(report.slug, include_unpublished=True) is not None
-    assert version.absolute_path.is_dir()
+    assert store.objects.stat(version.object_prefix + "manifest.json") > 0
 
 
 def test_expired_versions_can_be_removed(tmp_path):
@@ -293,7 +293,7 @@ def test_expired_versions_can_be_removed(tmp_path):
         report_key=REPORT_KEY,
         title=first.title,
         version="v1",
-        dir_path=first_ref.dir_path,
+        object_prefix=first_ref.object_prefix,
         manifest_sha256=first.manifest_sha256,
         size_bytes=first.size_bytes,
         schema_version=first.schema_version,
@@ -307,7 +307,7 @@ def test_expired_versions_can_be_removed(tmp_path):
         report_key=REPORT_KEY,
         title=second.title,
         version="v2",
-        dir_path=second_ref.dir_path,
+        object_prefix=second_ref.object_prefix,
         manifest_sha256=second.manifest_sha256,
         size_bytes=second.size_bytes,
         schema_version=second.schema_version,
@@ -321,7 +321,7 @@ def test_expired_versions_can_be_removed(tmp_path):
     assert [item.version for item in expired] == ["v1"]
     store.remove_version(report_id, "v1")
     repository.mark_version_deleted(report_id, "v1")
-    assert not first_ref.absolute_path.exists()
+    assert not list(store.objects.list_keys(first_ref.object_prefix))
     assert repository.get_version(report_id, "v1").status == "deleted"
 
 

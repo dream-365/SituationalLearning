@@ -2,16 +2,35 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
-import os
 import shutil
 import tarfile
+import threading
+import time
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from situlearn.web.config import Settings
+from situlearn.web.objectstore import (
+    ObjectNotFound,
+    ObjectStore,
+    build_object_store,
+)
+
+_SHARED_WITH_MACOS = {".DS_Store"}
+
+
+def _ignored_member(path: PurePosixPath) -> bool:
+    name = path.name
+    return (
+        name in _SHARED_WITH_MACOS
+        or name.startswith("._")
+        or path.parts[:1] == ("__MACOSX",)
+    )
 
 
 class PublishValidationError(ValueError):
@@ -42,8 +61,7 @@ class VersionRef:
 
     report_id: str
     version: str
-    dir_path: str
-    absolute_path: Path
+    object_prefix: str
 
 
 def _safe_member_path(name: str) -> PurePosixPath:
@@ -66,6 +84,8 @@ def _check_archive_members(
     total_size = 0
     for member in members:
         path = _safe_member_path(member.name)
+        if _ignored_member(path):
+            continue
         key = str(path)
         if key in files:
             raise PublishValidationError(
@@ -103,6 +123,8 @@ def _extract_members(
 ) -> None:
     for member in members:
         path = _safe_member_path(member.name)
+        if _ignored_member(path):
+            continue
         target = destination.joinpath(*path.parts)
         if member.isdir():
             target.mkdir(parents=True, exist_ok=True)
@@ -205,10 +227,26 @@ def _directory_size(root: Path) -> int:
 
 
 class ReportStore:
-    """Filesystem side of publishing: stage, validate, install, remove."""
+    """Stage local uploads, validate them, then install immutable objects."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self, settings: Settings, object_store: ObjectStore | None = None
+    ) -> None:
         self.settings = settings
+        self.objects = object_store or build_object_store(settings)
+        self._manifest_cache: dict[str, tuple[float, bytes]] = {}
+        self._cache_lock = threading.Lock()
+
+    def _version_prefix(self, report_id: str, version: str) -> str:
+        return f"{self.settings.object_prefix}reports/{report_id}/versions/{version}/"
+
+    def _asset_key(self, object_prefix: str, asset_path: str) -> str:
+        path = PurePosixPath(asset_path)
+        if not asset_path or asset_path.startswith("/") or "\\" in asset_path:
+            raise ValueError(f"unsafe asset path: {asset_path!r}")
+        if any(part in {"", ".", ".."} for part in path.parts):
+            raise ValueError(f"unsafe asset path: {asset_path!r}")
+        return f"{object_prefix}assets/{path.as_posix()}"
 
     def stage(self, archive_path: Path, *, report_key: str) -> StagedReport:
         self.settings.ensure_directories()
@@ -245,33 +283,56 @@ class ReportStore:
     def install(
         self, staged: StagedReport, *, report_id: str, version: str
     ) -> VersionRef:
-        target = self.settings.reports_dir / report_id / "versions" / version
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists():
+        prefix = self._version_prefix(report_id, version)
+        if next(self.objects.list_keys(prefix), None) is not None:
             raise PublishValidationError(
                 "ERR_PUBLISH_CONFLICT", f"version already exists: {version}"
             )
-        os.replace(staged.root, target)
-        return VersionRef(
-            report_id=report_id,
-            version=version,
-            dir_path=str(target.relative_to(self.settings.data_dir)),
-            absolute_path=target,
-        )
+        try:
+            for path in sorted(staged.root.rglob("*")):
+                if not path.is_file():
+                    continue
+                relative = path.relative_to(staged.root)
+                if _ignored_member(PurePosixPath(relative.as_posix())):
+                    continue
+                self.objects.put_file(f"{prefix}{relative.as_posix()}", path)
+        except Exception:
+            with contextlib.suppress(Exception):
+                self.objects.delete_prefix(prefix)
+            raise
+        shutil.rmtree(staged.root, ignore_errors=True)
+        return VersionRef(report_id=report_id, version=version, object_prefix=prefix)
 
     def abort(self, staged: StagedReport) -> None:
         shutil.rmtree(staged.root, ignore_errors=True)
 
     def remove_version(self, report_id: str, version: str) -> None:
-        target = self.settings.reports_dir / report_id / "versions" / version
-        shutil.rmtree(target, ignore_errors=True)
-        parent = target.parent
-        if parent.is_dir() and not any(parent.iterdir()):
-            parent.rmdir()
+        prefix = self._version_prefix(report_id, version)
+        self.objects.delete_prefix(prefix)
+        with self._cache_lock:
+            self._manifest_cache.pop(prefix, None)
 
-    def resolve(self, dir_path: str) -> Path:
-        candidate = (self.settings.data_dir / dir_path).resolve()
-        data_root = self.settings.data_dir.resolve()
-        if data_root not in candidate.parents and candidate != data_root:
-            raise ValueError("version path escapes data directory")
-        return candidate
+    def read_manifest(self, object_prefix: str) -> bytes:
+        if not object_prefix:
+            raise ObjectNotFound("version has no object prefix")
+        now = time.monotonic()
+        with self._cache_lock:
+            cached = self._manifest_cache.get(object_prefix)
+        if cached is not None and now - cached[0] < self.settings.oss_read_cache_ttl_s:
+            return cached[1]
+        data = self.objects.get_bytes(f"{object_prefix}manifest.json")
+        with self._cache_lock:
+            self._manifest_cache[object_prefix] = (now, data)
+        return data
+
+    def asset_size(self, object_prefix: str, asset_path: str) -> int:
+        return self.objects.stat(self._asset_key(object_prefix, asset_path))
+
+    def read_asset_range(
+        self, object_prefix: str, asset_path: str, start: int, end: int
+    ) -> Iterator[bytes]:
+        key = self._asset_key(object_prefix, asset_path)
+        return self.objects.read_range(key, start, end)
+
+    def healthcheck(self) -> None:
+        self.objects.healthcheck()
