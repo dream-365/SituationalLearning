@@ -256,6 +256,8 @@ graph TD
 | `filter_section` | 按章节筛选 |
 | `search_words` | 搜索单词、释义或语境 |
 | `no_words` | 没有匹配的单词 |
+| `play_pause` | 播放/暂停 |
+| `progress_label` | 播放进度 |
 
 ### 4.3 `resources`
 
@@ -481,7 +483,7 @@ Renderer 契约：
 2. Section 按数组顺序；`layout` 是提示，未知回退 `stack`；未知 `section.role` → 跳过该 section + warning。
 3. Narrative section 渲染其 narration group；`group` 递归；未知 `layout` 回退 `stack`；嵌套 >3 拒绝。
 4. `text` 默认纯文本转义；`markdown` 仅在显式支持并清洗后启用。
-5. `audio` 播放按钮；多音频块按文档顺序组成 section 播放列表；`group.script` 只显示一次；任何 group 内 `audio.script` 被拒绝；独立 audio 块可用 `audio.script`；缺资源显示 `labels.no_audio`。
+5. narration audio 不渲染逐 block 的原生 `<audio>`；每个 section 只显示一个紧凑播放按钮，audio 块按文档顺序组成 section 播放列表，由全页共享的底部播放条播放；`group.script` 只显示一次；任何 group 内 `audio.script` 被拒绝；独立 audio 块可用 `audio.script`；缺资源显示 `labels.no_audio`。
 6. `image` 渲染图片与 `alt`；缺资源占位；说明用后续 caption text。
 7. `word` 渲染卡片：term、kind、IPA、词性、释义（4.5.4 回退）、语境、note、发音、配图、分类标签、sources；`resources.credit` 与 `meta.attribution` 在页脚。
 8. `keywords` 渲染 chips；按 `word_id` 跳到词卡；无 `word_id` 不出现（strict 文档不允许）。

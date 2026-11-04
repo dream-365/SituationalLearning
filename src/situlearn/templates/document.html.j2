@@ -42,6 +42,7 @@
   .chapter { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin: 18px 0; scroll-margin-top: 24px; }
   .chapter-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
   .chapter-head .time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .chapter-head .no-audio { font-size: 12px; color: var(--muted); }
   .chapter-head .play { margin-left: auto; }
   button { font: inherit; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
   button:disabled { opacity: .45; cursor: not-allowed; }
@@ -68,7 +69,14 @@
   .vocab-filter { border: 1px solid var(--line); background: var(--paper); color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
   .vocab-filter.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .vocab-count-chip { opacity: .65; font-variant-numeric: tabular-nums; }
-  .vocab-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  .vocab-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .vocab-view { display: flex; gap: 6px; }
+  .role-vocabulary.is-compact .word { padding: 12px 14px; gap: 5px; }
+  .role-vocabulary.is-compact .word-context,
+  .role-vocabulary.is-compact .note,
+  .role-vocabulary.is-compact .sources { display: none; }
+  .role-vocabulary.is-compact .def { font-size: 14px; }
+  .role-vocabulary.is-compact .word-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
   .vocab-controls select, .vocab-controls input { font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
   .vocab-controls input { min-width: 220px; }
   .vocab-empty { color: var(--muted); padding: 24px 0; }
@@ -89,6 +97,15 @@
   .toc a { flex: 0 0 auto; min-height: 40px; display: inline-flex; align-items: center; font-size: 12px; color: var(--muted); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; background: var(--paper); }
   .to-top { position: fixed; right: 18px; bottom: 18px; z-index: 20; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--paper); border: 1px solid var(--line); color: var(--accent); text-decoration: none; box-shadow: 0 4px 14px rgba(33,31,27,.12); opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .2s ease, transform .2s ease; }
   .to-top.is-visible { opacity: 1; pointer-events: auto; transform: none; }
+  .player { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: rgba(255,253,249,.97); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(33,31,27,.08); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+  .player-inner { max-width: 980px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  .player-toggle { width: 40px; height: 40px; padding: 0; border-radius: 50%; flex: 0 0 auto; }
+  .player-main { flex: 1; min-width: 0; }
+  .player-label { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+  .player-seek { width: 100%; height: 20px; margin: 0; accent-color: var(--accent); }
+  .player-time { flex: 0 0 auto; min-width: 96px; text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  body.player-open { padding-bottom: 92px; }
+  body.player-open .to-top { bottom: 96px; }
   @media (max-width: 1100px) { .word-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 700px) {
     .word-grid { grid-template-columns: 1fr; }
@@ -98,6 +115,7 @@
     .vocab-filter { min-height: 44px; }
     .vocab-controls select, .vocab-controls input { min-height: 44px; }
     .word-audio { width: 44px; height: 44px; min-height: 44px; }
+    .player-time { min-width: 78px; font-size: 11px; }
   }
   .word { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 8px; }
   .word-image { max-height: 160px; object-fit: cover; }
@@ -139,15 +157,7 @@
       <div class="missing">{{ block.alt or labels.missing_image }}</div>
     {%- endif -%}
   {%- elif block.type == "audio" -%}
-    {%- set resource = resources.get(block.resource) -%}
-    {%- if resource and resource.href not in missing -%}
-      <div class="audio">
-        <audio controls preload="none" src="{{ resource.href }}"></audio>
-        {%- if block.script %}<p class="script">{{ block.script }}</p>{% endif -%}
-      </div>
-    {%- else -%}
-      <div class="missing">{{ labels.no_audio }}</div>
-    {%- endif -%}
+    {# Audio is played by the section playlist; no per-block native player. #}
   {%- elif block.type == "word" -%}
     <article class="word" id="word-{{ block.id }}" data-category="{{ block.category or '' }}" data-section-id="{{ block.section_id }}" data-search="{{ block.term }} {{ block.definitions.values()|join(' ') }} {{ block.context or '' }}">
       {%- if block.image and resources.get(block.image) and resources[block.image].href not in missing -%}
@@ -230,6 +240,10 @@
               {%- endfor -%}
             </div>
             <div class="vocab-controls">
+              <div class="vocab-view" role="group" aria-label="{{ labels.view_label }}">
+                <button type="button" class="vocab-filter is-active" data-density="cards">{{ labels.view_cards }}</button>
+                <button type="button" class="vocab-filter" data-density="compact">{{ labels.view_compact }}</button>
+              </div>
               <label class="visually-hidden" for="vocab-section-filter">{{ labels.filter_section }}</label>
               <select id="vocab-section-filter" data-section-filter aria-label="{{ labels.filter_section }}">
                 <option value="all">{{ labels.filter_all_sections }}</option>
@@ -261,8 +275,11 @@
             {%- if section.time -%}
               <span class="time">{{ format_ms(section.time.start_ms) }} – {{ format_ms(section.time.end_ms) }}</span>
             {%- endif -%}
-            {%- if section_audio.get(section.id) -%}
-              <button class="play" type="button" data-play-section="{{ section.id }}">{{ labels.play_section }}</button>
+            {%- set playlist = section_playlists.get(section.id, []) -%}
+            {%- if playlist -%}
+              <button class="play" type="button" data-playlist='{{ playlist | tojson }}' data-label="{{ section.title }}">{{ labels.play_section }}</button>
+            {%- elif section_audio.get(section.id) -%}
+              <span class="no-audio">{{ labels.no_audio }}</span>
             {%- endif -%}
           </div>
           {%- if section.keywords -%}
@@ -285,43 +302,126 @@
   {%- endif -%}
 </div>
 <a class="to-top" href="#top" aria-label="{{ labels.back_to_top }}" title="{{ labels.back_to_top }}">↑</a>
-<audio id="word-audio-player" preload="none"></audio>
+<div class="player" data-player hidden>
+  <div class="player-inner">
+    <button class="player-toggle" type="button" data-player-toggle aria-label="{{ labels.play_pause }}">▶</button>
+    <div class="player-main">
+      <div class="player-label" data-player-label></div>
+      <input class="player-seek" data-player-seek type="range" min="0" max="1000" value="0" aria-label="{{ labels.progress_label }}">
+      <div class="player-time" data-player-time>00:00 / 00:00</div>
+    </div>
+  </div>
+</div>
+<audio id="audio-player" preload="none"></audio>
 <script>
 (function () {
-  document.querySelectorAll("[data-play-section]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      var section = document.getElementById(button.getAttribute("data-play-section"));
-      if (!section) return;
-      var audios = Array.prototype.slice.call(section.querySelectorAll("audio"));
-      var index = 0;
-      function playNext() {
-        if (index >= audios.length) return;
-        var audio = audios[index++];
-        audio.play();
-        audio.addEventListener("ended", playNext, { once: true });
-      }
-      if (audios.length) playNext();
-    });
-  });
-
-  var wordPlayer = document.getElementById("word-audio-player");
+  var audioPlayer = document.getElementById("audio-player");
+  var playerBar = document.querySelector("[data-player]");
+  var playerToggle = document.querySelector("[data-player-toggle]");
+  var playerLabel = document.querySelector("[data-player-label]");
+  var playerSeek = document.querySelector("[data-player-seek]");
+  var playerTime = document.querySelector("[data-player-time]");
   var wordButtons = Array.prototype.slice.call(document.querySelectorAll("[data-word-audio]"));
-  wordButtons.forEach(function (button) {
-    button.addEventListener("click", function () {
-      var src = button.getAttribute("data-word-audio");
-      if (!src || !wordPlayer) return;
-      if (wordPlayer.getAttribute("src") !== src) wordPlayer.src = src;
-      wordPlayer.currentTime = 0;
-      wordPlayer.play();
-      wordButtons.forEach(function (item) { item.classList.remove("is-playing"); });
-      button.classList.add("is-playing");
+  var playlist = [];
+  var playlistIndex = 0;
+
+  function formatTime(value) {
+    if (!isFinite(value) || value < 0) value = 0;
+    var total = Math.floor(value);
+    var minutes = Math.floor(total / 60);
+    var seconds = total % 60;
+    return minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+  }
+
+  function updatePlayer() {
+    if (!audioPlayer) return;
+    var duration = audioPlayer.duration || 0;
+    var current = audioPlayer.currentTime || 0;
+    if (playerSeek) playerSeek.value = duration ? String(Math.round(current / duration * 1000)) : "0";
+    if (playerTime) playerTime.textContent = formatTime(current) + " / " + formatTime(duration);
+  }
+
+  function setPlayerVisible(visible) {
+    if (playerBar) playerBar.hidden = !visible;
+    document.body.classList.toggle("player-open", visible);
+  }
+
+  function playCurrent() {
+    if (!audioPlayer || playlistIndex >= playlist.length) return;
+    audioPlayer.src = playlist[playlistIndex];
+    audioPlayer.play().catch(function () {});
+  }
+
+  function playList(sources, label, withBar) {
+    playlist = sources || [];
+    playlistIndex = 0;
+    if (!playlist.length) return;
+    if (withBar) {
+      if (playerLabel) playerLabel.textContent = label || "";
+      setPlayerVisible(true);
+    } else {
+      setPlayerVisible(false);
+    }
+    playCurrent();
+  }
+
+  if (audioPlayer) {
+    audioPlayer.addEventListener("timeupdate", updatePlayer);
+    audioPlayer.addEventListener("loadedmetadata", updatePlayer);
+    audioPlayer.addEventListener("play", function () {
+      if (playerToggle) playerToggle.textContent = "❚❚";
     });
-  });
-  if (wordPlayer) {
-    wordPlayer.addEventListener("ended", function () {
+    audioPlayer.addEventListener("pause", function () {
+      if (playerToggle) playerToggle.textContent = "▶";
+    });
+    audioPlayer.addEventListener("ended", function () {
+      playlistIndex++;
+      if (playlistIndex < playlist.length) {
+        playCurrent();
+        return;
+      }
+      if (playerToggle) playerToggle.textContent = "▶";
       wordButtons.forEach(function (item) { item.classList.remove("is-playing"); });
     });
   }
+  if (playerToggle) {
+    playerToggle.addEventListener("click", function () {
+      if (!audioPlayer) return;
+      if (audioPlayer.paused) audioPlayer.play().catch(function () {});
+      else audioPlayer.pause();
+    });
+  }
+  if (playerSeek) {
+    playerSeek.addEventListener("input", function () {
+      var duration = audioPlayer && audioPlayer.duration ? audioPlayer.duration : 0;
+      if (duration && audioPlayer) {
+        audioPlayer.currentTime = Number(playerSeek.value) / 1000 * duration;
+      }
+    });
+  }
+
+  document.querySelectorAll("[data-playlist]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var sources;
+      try {
+        sources = JSON.parse(button.getAttribute("data-playlist") || "[]");
+      } catch (error) {
+        return;
+      }
+      wordButtons.forEach(function (item) { item.classList.remove("is-playing"); });
+      playList(sources, button.getAttribute("data-label") || "", true);
+    });
+  });
+
+  wordButtons.forEach(function (button) {
+    button.addEventListener("click", function () {
+      var src = button.getAttribute("data-word-audio");
+      if (!src) return;
+      wordButtons.forEach(function (item) { item.classList.remove("is-playing"); });
+      button.classList.add("is-playing");
+      playList([src], "", false);
+    });
+  });
 
   var vocabulary = document.querySelector(".role-vocabulary");
   if (!vocabulary) return;
@@ -338,6 +438,28 @@
   groups.forEach(function (group) {
     groupLimits[group.getAttribute("data-vocab-group")] = isPhone ? 6 : Infinity;
   });
+
+  var densityButtons = Array.prototype.slice.call(vocabulary.querySelectorAll("[data-density]"));
+  var density = "cards";
+  try {
+    density = localStorage.getItem("situlearn-vocab-density") || "cards";
+  } catch (error) {}
+  function applyDensity() {
+    vocabulary.classList.toggle("is-compact", density === "compact");
+    densityButtons.forEach(function (button) {
+      button.classList.toggle("is-active", button.getAttribute("data-density") === density);
+    });
+  }
+  densityButtons.forEach(function (button) {
+    button.addEventListener("click", function () {
+      density = button.getAttribute("data-density");
+      try {
+        localStorage.setItem("situlearn-vocab-density", density);
+      } catch (error) {}
+      applyDensity();
+    });
+  });
+  applyDensity();
 
   function applyWordFilters() {
     var query = (search && search.value ? search.value : "").trim().toLowerCase();

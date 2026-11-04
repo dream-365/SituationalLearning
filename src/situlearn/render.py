@@ -48,6 +48,11 @@ DEFAULT_LABELS: dict[str, str] = {
     "back_to_top": "回到顶部",
     "toc_heading": "目录",
     "other_category": "其他",
+    "play_pause": "播放/暂停",
+    "progress_label": "播放进度",
+    "view_label": "显示方式",
+    "view_cards": "卡片",
+    "view_compact": "紧凑",
 }
 
 CATEGORY_ORDER = (
@@ -150,10 +155,20 @@ def _render_html(
         section_titles = {section.id: section.title for section in document.sections}
     if group_words is None:
         group_words = _group_words
-    section_audio = {
-        section.id: any(isinstance(block, AudioBlock) for block in iter_blocks(section.blocks))
-        for section in document.sections
-    }
+    section_playlists: dict[str, list[str]] = {}
+    section_audio: dict[str, bool] = {}
+    for section in document.sections:
+        hrefs: list[str] = []
+        has_audio = False
+        for block in iter_blocks(section.blocks):
+            if not isinstance(block, AudioBlock):
+                continue
+            has_audio = True
+            resource = document.resources.get(block.resource)
+            if resource is not None and resource.href not in missing:
+                hrefs.append(resource.href)
+        section_playlists[section.id] = hrefs
+        section_audio[section.id] = has_audio
     duration_min = None
     if document.meta.source and document.meta.source.duration_ms:
         duration_min = round(document.meta.source.duration_ms / 60_000, 1)
@@ -164,6 +179,7 @@ def _render_html(
         missing=missing,
         word_index=word_index,
         resources=document.resources,
+        section_playlists=section_playlists,
         section_audio=section_audio,
         format_ms=_format_ms,
         definition=_definition,

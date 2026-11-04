@@ -128,8 +128,10 @@ def test_render_directory_escapes_and_copies_media(tmp_path: Path) -> None:
     assert (out / "media" / "audio" / "a.mp3").read_bytes() == audio
     assert (out / "media" / "images" / "a.jpg").read_bytes() == image
     assert not (out / "document.json").exists()
-    assert "<audio" in html and "<img" in html
-    assert "data-play-section" in html
+    assert html.count("<audio") == 1
+    assert "<img" in html
+    assert "data-playlist" in html
+    assert "data-player" in html
     assert 'data-category-filter="domain_term"' in html
     assert 'data-section-filter' in html
     assert 'data-word-search' in html
@@ -142,6 +144,7 @@ def test_render_directory_escapes_and_copies_media(tmp_path: Path) -> None:
     assert 'class="toc"' in html
     assert 'data-group-more' in html
     assert "vocab-group-head" in html
+    assert 'data-density="compact"' in html
     assert "&lt;b&gt;文字&lt;/b&gt;" in html
     assert "&lt;script&gt;term&lt;/script&gt;" in html
     assert "&lt;b&gt;释义&lt;/b&gt;" in html
