@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import zipfile
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from situlearn.document import (
     parse_document,
     raise_for_errors,
 )
+from situlearn.knowledge import SourceRef, is_ai_source
 from situlearn.resolver import (
     DirectoryResolver,
     PackageResolver,
@@ -32,7 +34,40 @@ DEFAULT_LABELS: dict[str, str] = {
     "vocabulary_heading": "生词本",
     **CATEGORY_LABEL_KEYS,
     "missing_image": "图片缺失",
+    "filter_all": "全部",
+    "filter_all_sections": "全部章节",
+    "filter_category": "按分类筛选",
+    "filter_section": "按章节筛选",
+    "search_words": "搜索单词、释义或语境",
+    "no_words": "没有匹配的单词",
+    "show_more": "显示更多",
+    "sources_label": "来源",
+    "context_label": "语境",
+    "word_audio_label": "播放发音",
+    "word_origin_prefix": "出自",
+    "back_to_top": "回到顶部",
+    "toc_heading": "目录",
+    "other_category": "其他",
 }
+
+CATEGORY_ORDER = (
+    "domain_term",
+    "proper_noun",
+    "work_title",
+    "school_genre",
+    "common_advanced",
+)
+
+
+def _group_words(blocks: list[WordBlock]) -> list[dict[str, object]]:
+    grouped: dict[str, list[WordBlock]] = {}
+    for block in blocks:
+        grouped.setdefault(block.category or "other", []).append(block)
+    ordered: list[dict[str, object]] = []
+    for key in (*CATEGORY_ORDER, "other"):
+        if key in grouped:
+            ordered.append({"key": key, "blocks": grouped[key]})
+    return ordered
 
 
 class RenderError(RuntimeError):
@@ -74,6 +109,10 @@ def _category_label(block: WordBlock, labels: dict[str, str]) -> str:
     return labels.get(f"category.{block.category}", block.category)
 
 
+def _visible_sources(block: WordBlock) -> list[SourceRef]:
+    return [source for source in (block.sources or []) if not is_ai_source(source)]
+
+
 def _template_dir() -> Path:
     return Path(__file__).resolve().parent / "templates"
 
@@ -91,13 +130,26 @@ def _render_html(
     missing: set[str],
     labels: dict[str, str],
     pwa_manifest_url: str | None = None,
+    category_counts: Counter[str] | None = None,
+    section_counts: Counter[str] | None = None,
+    section_titles: dict[str, str] | None = None,
+    group_words=None,
 ) -> str:
-    word_index = {
-        block.id: block
+    words = [
+        block
         for section in document.sections
         for block in iter_blocks(section.blocks)
         if isinstance(block, WordBlock)
-    }
+    ]
+    word_index = {block.id: block for block in words}
+    if category_counts is None:
+        category_counts = Counter(block.category for block in words if block.category)
+    if section_counts is None:
+        section_counts = Counter(block.section_id for block in words)
+    if section_titles is None:
+        section_titles = {section.id: section.title for section in document.sections}
+    if group_words is None:
+        group_words = _group_words
     section_audio = {
         section.id: any(isinstance(block, AudioBlock) for block in iter_blocks(section.blocks))
         for section in document.sections
@@ -118,6 +170,11 @@ def _render_html(
         category_label=_category_label,
         duration_min=duration_min,
         pwa_manifest_url=pwa_manifest_url,
+        category_counts=category_counts,
+        section_counts=section_counts,
+        section_titles=section_titles,
+        group_words=group_words,
+        visible_sources=_visible_sources,
     )
 
 

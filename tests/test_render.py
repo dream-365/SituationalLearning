@@ -102,7 +102,8 @@ def _make_report(tmp_path: Path) -> tuple[Path, bytes, bytes]:
                         "audio": "aud-1",
                         "image": "img-1",
                         "sources": [
-                            {"name": "Wiktionary", "url": "https://example.com"}
+                            {"name": "DeepSeek 语境释义", "url": "https://api.deepseek.com"},
+                            {"name": "Wiktionary", "url": "https://example.com"},
                         ],
                     }
                 ],
@@ -129,12 +130,26 @@ def test_render_directory_escapes_and_copies_media(tmp_path: Path) -> None:
     assert not (out / "document.json").exists()
     assert "<audio" in html and "<img" in html
     assert "data-play-section" in html
+    assert 'data-category-filter="domain_term"' in html
+    assert 'data-section-filter' in html
+    assert 'data-word-search' in html
+    assert 'data-category="domain_term"' in html
+    assert 'data-section-id="s1"' in html
+    assert 'data-word-count' in html
+    assert 'data-vocab-group="domain_term"' in html
+    assert "word-audio" in html
+    assert "word-origin" in html
+    assert 'class="toc"' in html
+    assert 'data-group-more' in html
+    assert "vocab-group-head" in html
     assert "&lt;b&gt;文字&lt;/b&gt;" in html
     assert "&lt;script&gt;term&lt;/script&gt;" in html
     assert "&lt;b&gt;释义&lt;/b&gt;" in html
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
     assert "<b>文字</b>" not in html
     assert "<script>term</script>" not in html
+    assert "DeepSeek 语境释义" not in html
+    assert "Wiktionary" in html
 
 
 def test_render_situ_package(tmp_path: Path) -> None:

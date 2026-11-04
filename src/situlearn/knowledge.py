@@ -6,6 +6,9 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 
+AI_SOURCE_NAME = "DeepSeek 语境释义"
+AI_SOURCE_HOST = "api.deepseek.com"
+
 
 class ContentType(StrEnum):
     DOCUMENTARY = "documentary"
@@ -35,6 +38,12 @@ class AudioSource(StrEnum):
 class SourceRef(BaseModel):
     name: str = Field(min_length=1)
     url: HttpUrl
+
+
+def is_ai_source(source: SourceRef) -> bool:
+    """Return True for the old synthetic 'DeepSeek contextual gloss' source."""
+
+    return source.name == AI_SOURCE_NAME or (source.url.host or "") == AI_SOURCE_HOST
 
 
 class NarrativeSection(BaseModel):
@@ -100,7 +109,7 @@ class TermEntry(BaseModel):
     why_it_matters: str = Field(min_length=15, max_length=120)
     section_id: str = Field(min_length=1)
     category: TermCategory
-    sources: list[SourceRef] = Field(min_length=1)
+    sources: list[SourceRef] = Field(default_factory=list)
 
 
 class AudioAsset(BaseModel):

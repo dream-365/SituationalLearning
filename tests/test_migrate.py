@@ -51,7 +51,10 @@ def _manifest() -> ReportManifest:
             why_it_matters="这是理解第一段论证推进的关键线索。",
             section_id="sec-01",
             category=TermCategory.DOMAIN_TERM,
-            sources=[SourceRef(name="Wiktionary", url="https://example.com/alpha")],
+            sources=[
+                SourceRef(name="DeepSeek 语境释义", url="https://api.deepseek.com"),
+                SourceRef(name="Wiktionary", url="https://example.com/alpha"),
+            ],
         ),
         TermEntry(
             term="beta",
@@ -159,6 +162,7 @@ def test_migrate_report_builds_document(tmp_path: Path) -> None:
     assert alpha.audio is not None
     assert alpha.audio in document.resources
     assert document.sections[0].keywords[0].word_id == alpha.id
+    assert [source.name for source in (alpha.sources or [])] == ["Wiktionary"]
     assert document.sections[0].blocks[0].script == "这是第1节播报稿，长度足够。"
     assert document.meta.labels["vocabulary_heading"] == "生词本"
     assert "category.domain_term" in document.meta.labels

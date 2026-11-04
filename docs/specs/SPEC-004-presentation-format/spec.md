@@ -251,6 +251,11 @@ graph TD
 | `category.work_title` | 作品名 |
 | `category.school_genre` | 流派/时期 |
 | `category.common_advanced` | 低频普通词 |
+| `filter_all` | 全部 |
+| `filter_category` | 按分类筛选 |
+| `filter_section` | 按章节筛选 |
+| `search_words` | 搜索单词、释义或语境 |
+| `no_words` | 没有匹配的单词 |
 
 ### 4.3 `resources`
 
@@ -484,6 +489,7 @@ Renderer 契约：
 10. 在线 `href` 解析为公开 URL；离线解析为包内 entry。
 11. `meta.labels` 覆盖默认文案；分类标签优先 `labels.category.*`。
 12. `meta.attribution` 渲染为页脚署名。
+13. **Vocabulary 专用组件**：`vocabulary` section 渲染为“筛选工具栏 + 词卡网格”，而不是平铺长列表。工具栏包含分类筛选（All + 5 个 category）、章节筛选（All + 每个 narrative section）、搜索（term/definitions/context）、当前数量和空状态。筛选默认在客户端完成，离线 HTML 与 Web 页面共用同一套 DOM 契约；词卡带 `data-category`、`data-section-id`、`data-search`。
 
 **4.9.1 公开投影（public projection）**
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-04 — Vocabulary 专用组件
+
+- `vocabulary` section 改为独立组件：分类筛选（带数量）、章节筛选（带数量）、搜索、结果计数、空状态。
+- 默认按 category 分组，组头显示数量；手机端初始 24 张 + “显示更多”。
+- 词卡：分类徽章移到顶部、POS 次要化、语境/来源折叠、增加“出自 第X章”回链。
+- 77 个原生 audio 控件替换为紧凑发音按钮 + 单例共享播放器。
+- 章节 chips 跳转时清除冲突筛选、揭示并高亮目标；新增目录导航与回到顶部。
+- 响应式：iPad 两列、手机一列；筛选工具栏 sticky；控件 44px 触控高度。
+- 更新 SPEC-004 §4.9 与 labels。
+
 ## 2026-11-04 — 实现完成
 
 - T0a/T0b：document 模型、strict writer / tolerant reader、JSON Schema。

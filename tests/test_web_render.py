@@ -48,6 +48,8 @@ def test_vocabulary_page_filters(tmp_path: Path) -> None:
     response = test_client.get(f"/r/{slug}/vocabulary?section=s0")
     assert response.status_code == 200
     assert 'id="word-w-1"' in response.text
+    assert 'data-category-filter="domain_term"' in response.text
+    assert "data-word-search" in response.text
 
     empty = test_client.get(f"/r/{slug}/vocabulary?section=s1")
     assert 'id="word-w-1"' not in empty.text

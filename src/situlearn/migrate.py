@@ -19,7 +19,7 @@ from situlearn.document import (
     check_document,
     raise_for_errors,
 )
-from situlearn.knowledge import AudioSource, ReportManifest
+from situlearn.knowledge import AudioSource, ReportManifest, is_ai_source
 
 DEFAULT_ATTRIBUTION = (
     "Oxford Learner's Dictionaries",
@@ -208,8 +208,9 @@ def _word_blocks(
             resource_id = resource_by_path.get(term.audio_ref)
             if resource_id:
                 block["audio"] = resource_id
-        if term.sources:
-            block["sources"] = [source.model_dump(mode="json") for source in term.sources]
+        sources = [source for source in term.sources if not is_ai_source(source)]
+        if sources:
+            block["sources"] = [source.model_dump(mode="json") for source in sources]
         blocks.append(block)
         key = term.term.casefold()
         if key in by_term:

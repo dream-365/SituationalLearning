@@ -33,6 +33,7 @@ from situlearn.knowledge import (
     SourceRef,
     TermCandidate,
     TermEntry,
+    is_ai_source,
 )
 from situlearn.llm import make_chat_model
 from situlearn.migrate import compile_manifest
@@ -187,6 +188,15 @@ def _load_or_create_dictionary(
     return mapping
 
 
+def _without_ai_sources(terms: list[TermEntry]) -> list[TermEntry]:
+    return [
+        term.model_copy(
+            update={"sources": [source for source in term.sources if not is_ai_source(source)]}
+        )
+        for term in terms
+    ]
+
+
 def _load_or_create_gloss(
     llm,
     candidates,
@@ -200,10 +210,14 @@ def _load_or_create_gloss(
         payload = _read_json(cache_path)
         if isinstance(payload, list):
             try:
-                return [TermEntry.model_validate(item) for item in payload]
+                return _without_ai_sources(
+                    [TermEntry.model_validate(item) for item in payload]
+                )
             except (TypeError, ValueError):
                 pass
-    terms = gloss_terms(llm, candidates, dictionary, profile=profile)
+    terms = _without_ai_sources(
+        gloss_terms(llm, candidates, dictionary, profile=profile)
+    )
     cache_path.write_text(
         json.dumps(
             [term.model_dump(mode="json") for term in terms],
