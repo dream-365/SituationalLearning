@@ -26,3 +26,12 @@ def test_build_rejects_unknown_content_type() -> None:
         )
 
     assert exc.value.code == 2
+
+
+def test_build_accepts_no_render_and_package() -> None:
+    args = build_parser().parse_args(
+        ["build", "input.srt", "--out", "out", "--no-render", "--package"]
+    )
+
+    assert args.no_render is True
+    assert args.package is True

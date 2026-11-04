@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import zipfile
 from io import StringIO
 from pathlib import Path
 
@@ -139,12 +140,13 @@ def test_build_report_no_audio(tmp_path: Path, monkeypatch) -> None:
     assert "解析字幕：4 条" in messages
     assert "内容切分：1 个片段" in messages
     assert "--no-audio" in messages
-    assert result.report_path.exists()
-    assert result.manifest_path.exists()
+    assert result.document_path.exists()
+    assert result.html_path is not None and result.html_path.exists()
+    assert result.package_path is None
     assert result.cue_count == 4
     assert result.term_count == 1
     assert "audio_disabled" in result.warnings
-    assert "测试报告" in result.report_path.read_text(encoding="utf-8")
+    assert "测试报告" in result.html_path.read_text(encoding="utf-8")
 
 
 def test_build_report_documentary_manifest_config_is_legacy(
@@ -162,19 +164,12 @@ def test_build_report_documentary_manifest_config_is_legacy(
         cache_root=tmp_path / ".cache",
     )
 
-    config = json.loads(result.manifest_path.read_text(encoding="utf-8"))["config"]
-    assert list(config) == [
-        "llm_framework",
-        "llm_provider",
-        "llm_model",
-        "narrative_language",
-        "tts_model",
-        "tts_voice",
-        "prompt_version",
-        "langchain_version",
-        "langchain_deepseek_version",
-    ]
-    assert "content_type" not in config
+    document = json.loads(result.document_path.read_text(encoding="utf-8"))
+    assert document["meta"]["kind"] == "documentary"
+    assert document["meta"]["labels"]["report_eyebrow"] == "情景学习 · 字幕学习报告"
+    assert "content_type" not in document["meta"]
+    assert result.html_path is not None
+    assert "内容脉络" in result.html_path.read_text(encoding="utf-8")
 
 
 def _write_sample_srt(tmp_path: Path) -> Path:
@@ -223,15 +218,17 @@ def test_build_report_movie_uses_plot_labels(tmp_path: Path, monkeypatch) -> Non
         progress=Progress(progress_out),
     )
 
-    manifest = result.manifest_path.read_text(encoding="utf-8")
-    html = result.report_path.read_text(encoding="utf-8")
+    document = json.loads(result.document_path.read_text(encoding="utf-8"))
+    assert result.html_path is not None
+    html = result.html_path.read_text(encoding="utf-8")
     messages = progress_out.getvalue()
 
-    assert '"content_type": "movie"' in manifest
+    assert document["meta"]["kind"] == "movie"
+    assert document["meta"]["labels"]["report_eyebrow"] == "情景学习 · 电影学习报告"
     assert "剧情脉络" in html
     assert "电影学习报告" in html
-    assert "全部场景" in html
-    assert "回到本场" in html
+    assert "先听一遍剧情" in html
+    assert "场景" in html
     assert "内容脉络" not in html
     assert "剧情脉络" in messages
     assert "--no-audio" in messages
@@ -271,9 +268,12 @@ def test_build_report_discards_out_of_profile_cached_narrative(
         cache_root=tmp_path / ".cache",
     )
 
-    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    document = json.loads(result.document_path.read_text(encoding="utf-8"))
     assert calls == [1]
-    assert len(manifest["narrative"]["sections"]) == 6
+    narrative_sections = [
+        section for section in document["sections"] if section["role"] == "narrative"
+    ]
+    assert len(narrative_sections) == 6
     cached = json.loads((cache_dir / "narrative-v2.json").read_text(encoding="utf-8"))
     assert len(cached["sections"]) == 6
 
@@ -313,7 +313,33 @@ def test_build_report_cache_is_isolated_by_content_type(
     cache_dirs = {path.name for path in (tmp_path / ".cache").iterdir()}
     assert len(cache_dirs) == 2
     assert any(name.endswith("-movie") for name in cache_dirs)
-    assert "测试报告" in documentary.report_path.read_text(encoding="utf-8")
-    assert "电影测试报告" in movie.report_path.read_text(encoding="utf-8")
-    assert '"content_type": "movie"' in movie.manifest_path.read_text(encoding="utf-8")
-    assert "content_type" not in documentary.manifest_path.read_text(encoding="utf-8")
+    assert documentary.html_path is not None
+    assert movie.html_path is not None
+    assert "测试报告" in documentary.html_path.read_text(encoding="utf-8")
+    assert "电影测试报告" in movie.html_path.read_text(encoding="utf-8")
+    documentary_doc = json.loads(documentary.document_path.read_text(encoding="utf-8"))
+    movie_doc = json.loads(movie.document_path.read_text(encoding="utf-8"))
+    assert documentary_doc["meta"]["kind"] == "documentary"
+    assert movie_doc["meta"]["kind"] == "movie"
+
+
+def test_build_report_no_render_and_package(tmp_path: Path, monkeypatch) -> None:
+    srt = _write_sample_srt(tmp_path)
+    _patch_llm_stages(monkeypatch, _script(), _candidate(), _entry())
+
+    result = pipeline.build_report(
+        srt,
+        tmp_path / "out",
+        terms_min=1,
+        terms_max=1,
+        no_audio=True,
+        render=False,
+        package=True,
+        cache_root=tmp_path / ".cache",
+    )
+
+    assert result.html_path is None
+    assert not (tmp_path / "out" / "index.html").exists()
+    assert result.package_path is not None and result.package_path.is_file()
+    with zipfile.ZipFile(result.package_path) as archive:
+        assert "document.json" in archive.namelist()

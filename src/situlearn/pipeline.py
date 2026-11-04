@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -34,8 +35,10 @@ from situlearn.knowledge import (
     TermEntry,
 )
 from situlearn.llm import make_chat_model
+from situlearn.migrate import compile_manifest
+from situlearn.packager import package_directory
 from situlearn.progress import Progress
-from situlearn.report import assemble_report
+from situlearn.render import render_document_in_place
 from situlearn.segmenter import segment_cues
 from situlearn.srt import parse_srt
 from situlearn.tts import XiaomiTTS
@@ -45,8 +48,9 @@ DEFAULT_CACHE_ROOT = Path.home() / ".cache" / "situlearn"
 
 @dataclass
 class BuildResult:
-    report_path: Path
-    manifest_path: Path
+    document_path: Path
+    html_path: Path | None
+    package_path: Path | None
     cue_count: int
     segment_count: int
     term_count: int
@@ -234,6 +238,8 @@ def build_report(
     terms_min: int | None = None,
     terms_max: int | None = None,
     no_audio: bool = False,
+    render: bool = True,
+    package: bool = False,
     force: bool = False,
     cache_root: Path | None = None,
     progress: Progress | None = None,
@@ -447,15 +453,32 @@ def build_report(
         warnings=warnings,
     )
 
-    progress.stage("生成报告：manifest.json + report.html")
+    progress.stage("生成文档：document.json + media/")
     out_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = out_dir / "manifest.json"
-    manifest_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
-    report_path = assemble_report(manifest, out_dir)
+    compiled = compile_manifest(manifest, out_dir, out_dir, source_language="en")
+    warnings = list(compiled.warnings)
+    shutil.rmtree(out_dir / "assets", ignore_errors=True)
+    for stale in ("manifest.json", "report.html"):
+        (out_dir / stale).unlink(missing_ok=True)
+    document_path = out_dir / "document.json"
+
+    html_path: Path | None = None
+    if render:
+        progress.stage("生成派生 HTML")
+        rendered = render_document_in_place(compiled.document, out_dir)
+        html_path = rendered.html_path
+        warnings.extend(rendered.warnings)
+
+    package_path: Path | None = None
+    if package:
+        progress.stage("打包 .situ")
+        package_path = out_dir.parent / f"{out_dir.name}.situ"
+        package_directory(out_dir, package_path, force=True)
 
     return BuildResult(
-        report_path=report_path,
-        manifest_path=manifest_path,
+        document_path=document_path,
+        html_path=html_path,
+        package_path=package_path,
         cue_count=len(cues),
         segment_count=len(segments),
         term_count=len(terms),

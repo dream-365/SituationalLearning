@@ -1,6 +1,6 @@
 # iPad 真机冒烟与锁屏播放 Runbook
 
-适用版本：SPEC-002 公网发布与 iPad 播放（v0.2）
+适用版本：SPEC-004 文档格式（v0.2.2）；SPEC-002 的发布细节已被取代
 
 设备要求：目标 iPad，iPadOS 17+，Safari；稳定 Wi-Fi；至少一份已发布的真实报告。
 

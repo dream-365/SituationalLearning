@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="{{ document.meta.language }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; media-src 'self'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+{%- if pwa_manifest_url %}
+<link rel="manifest" href="{{ pwa_manifest_url }}">
+{%- endif %}
+<title>{{ document.meta.title }} · 情景学习</title>
+<style>
+  :root {
+    --bg: #f7f4ee;
+    --paper: #fffdf9;
+    --ink: #211f1b;
+    --muted: #6d675d;
+    --line: #ddd5c8;
+    --accent: #8a3b2f;
+    --accent-soft: #f0e3dc;
+    --gold: #b08a3e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
+    line-height: 1.7;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px 72px; }
+  header.hero { padding: 56px 0 32px; border-bottom: 1px solid var(--line); margin-bottom: 32px; }
+  .eyebrow { font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin: 0 0 12px; }
+  h1, h2, h3 { font-family: Georgia, "Songti SC", "Noto Serif SC", serif; font-weight: 600; }
+  h1 { font-size: clamp(30px, 4.5vw, 50px); line-height: 1.15; margin: 0 0 14px; }
+  h2 { font-size: 24px; margin: 0; }
+  h3 { font-size: 21px; margin: 0; }
+  .subtitle { font-size: 18px; color: var(--muted); margin: 0 0 14px; max-width: 760px; }
+  .description { background: var(--paper); border-left: 3px solid var(--gold); padding: 16px 20px; margin: 20px 0 0; }
+  .meta { font-size: 13px; color: var(--muted); }
+  .narrative-intro { margin: 0 0 14px; }
+  .section-lead { color: var(--muted); margin: 6px 0 0; }
+  .chapter { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin: 18px 0; scroll-margin-top: 24px; }
+  .chapter-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .chapter-head .time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .chapter-head .play { margin-left: auto; }
+  button { font: inherit; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 0; }
+  .chip { font-size: 12px; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 3px 10px; text-decoration: none; }
+  .group { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+  .group.layout-row { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
+  .group.layout-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .text { margin: 0; }
+  .text-heading { font-family: Georgia, "Songti SC", serif; font-size: 20px; font-weight: 600; }
+  .text-caption { color: var(--muted); font-size: 13px; }
+  .text-quote { border-left: 3px solid var(--gold); padding-left: 14px; color: var(--muted); }
+  figure { margin: 0; }
+  img { max-width: 100%; border-radius: 10px; display: block; }
+  audio { width: 100%; margin: 6px 0; }
+  .script { color: var(--muted); font-size: 14px; }
+  details.script summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+  .missing { border: 1px dashed var(--line); border-radius: 10px; padding: 18px; color: var(--muted); font-size: 14px; }
+  .role-vocabulary { background: transparent; border: 0; padding: 0; }
+  .role-vocabulary .chapter-head { margin-bottom: 14px; }
+  .word-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 14px; }
+  .word { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+  .word-image { max-height: 160px; object-fit: cover; }
+  .word-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .ipa { font-size: 13px; color: var(--muted); }
+  .pos { font-size: 12px; color: var(--gold); text-transform: uppercase; letter-spacing: .08em; }
+  .def { margin: 0; }
+  blockquote { margin: 0; padding: 10px 12px; background: #f3eee5; border-radius: 8px; font-size: 13px; color: #4a453d; }
+  .note { margin: 0; font-size: 13px; color: var(--muted); }
+  .badge { font-size: 11px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--muted); }
+  .sources { display: flex; gap: 10px; flex-wrap: wrap; margin-top: auto; padding-top: 6px; }
+  .sources a { font-size: 12px; color: var(--accent); text-decoration: none; }
+  footer { border-top: 1px solid var(--line); margin-top: 40px; padding-top: 18px; font-size: 12px; color: var(--muted); }
+  @media (max-width: 600px) {
+    .wrap { padding: 0 16px 48px; }
+    header.hero { padding-top: 36px; }
+    .chapter { padding: 18px; }
+    .group.layout-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+{% macro render_block(block) -%}
+  {%- if block.type == "text" -%}
+    <p class="text text-{{ block.style.value }}">{{ block.text }}</p>
+  {%- elif block.type == "image" -%}
+    {%- set resource = resources.get(block.resource) -%}
+    {%- if resource and resource.href not in missing -%}
+      <figure><img src="{{ resource.href }}" alt="{{ block.alt or resource.alt or '' }}" loading="lazy"></figure>
+    {%- else -%}
+      <div class="missing">{{ block.alt or labels.missing_image }}</div>
+    {%- endif -%}
+  {%- elif block.type == "audio" -%}
+    {%- set resource = resources.get(block.resource) -%}
+    {%- if resource and resource.href not in missing -%}
+      <div class="audio">
+        <audio controls preload="none" src="{{ resource.href }}"></audio>
+        {%- if block.script %}<p class="script">{{ block.script }}</p>{% endif -%}
+      </div>
+    {%- else -%}
+      <div class="missing">{{ labels.no_audio }}</div>
+    {%- endif -%}
+  {%- elif block.type == "word" -%}
+    <article class="word" id="word-{{ block.id }}">
+      {%- if block.image and resources.get(block.image) and resources[block.image].href not in missing -%}
+        <img class="word-image" src="{{ resources[block.image].href }}" alt="">
+      {%- endif -%}
+      <div class="word-head">
+        <h3>{{ block.term }}</h3>
+        {%- if block.ipa %}<span class="ipa">{{ block.ipa }}</span>{% endif -%}
+        {%- if block.part_of_speech %}<span class="pos">{{ block.part_of_speech }}</span>{% endif -%}
+      </div>
+      <p class="def">{{ definition(block, document.meta.language) }}</p>
+      {%- if block.context %}<blockquote>{{ block.context }}</blockquote>{% endif -%}
+      {%- if block.note %}<p class="note">{{ block.note }}</p>{% endif -%}
+      {%- if block.audio and resources.get(block.audio) and resources[block.audio].href not in missing -%}
+        <audio controls preload="none" src="{{ resources[block.audio].href }}"></audio>
+      {%- endif -%}
+      {%- if block.category %}<span class="badge">{{ category_label(block, labels) }}</span>{% endif -%}
+      {%- if block.sources -%}
+        <div class="sources">
+          {%- for source in block.sources -%}
+            <a href="{{ source.url }}" rel="noopener noreferrer">{{ source.name }}</a>
+          {%- endfor -%}
+        </div>
+      {%- endif -%}
+    </article>
+  {%- elif block.type == "group" -%}
+    <div class="group layout-{{ block.layout.value if block.layout else 'stack' }}">
+      {%- if block.script -%}
+        <details class="script"><summary>{{ labels.expand_script }}</summary><p>{{ block.script }}</p></details>
+      {%- endif -%}
+      {%- for child in block.blocks -%}{{ render_block(child) }}{%- endfor -%}
+    </div>
+  {%- endif -%}
+{%- endmacro %}
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">{{ labels.report_eyebrow }}</p>
+    <h1>{{ document.meta.title }}</h1>
+    {%- if document.meta.subtitle %}<p class="subtitle">{{ document.meta.subtitle }}</p>{% endif -%}
+    <p class="meta">
+      {%- if duration_min is not none %}{{ duration_min }} 分钟 · {% endif -%}
+      {{ document.sections | length }} {{ labels.section_unit }} ·
+      {{ word_index | length }} 个词条
+    </p>
+    {%- if document.meta.description %}<p class="description">{{ document.meta.description }}</p>{% endif -%}
+  </header>
+
+  <main>
+    <section class="narrative-intro">
+      <h2>{{ labels.narrative_heading }}</h2>
+      <p class="section-lead">{{ labels.narrative_lead }}</p>
+    </section>
+    {%- for section in document.sections -%}
+      {%- if section.role.value == "vocabulary" -%}
+        <section class="chapter role-vocabulary" id="{{ section.id }}">
+          <div class="chapter-head"><h2>{{ section.title }}</h2></div>
+          <div class="word-grid">
+            {%- for block in section.blocks -%}{{ render_block(block) }}{%- endfor -%}
+          </div>
+        </section>
+      {%- else -%}
+        <section class="chapter role-{{ section.role.value }}" id="{{ section.id }}">
+          <div class="chapter-head">
+            <h2>{{ section.title }}</h2>
+            {%- if section.time -%}
+              <span class="time">{{ format_ms(section.time.start_ms) }} – {{ format_ms(section.time.end_ms) }}</span>
+            {%- endif -%}
+            {%- if section_audio.get(section.id) -%}
+              <button class="play" type="button" data-play-section="{{ section.id }}">{{ labels.play_section }}</button>
+            {%- endif -%}
+          </div>
+          {%- if section.keywords -%}
+            <div class="chips">
+              {%- for keyword in section.keywords -%}
+                {%- set word = word_index.get(keyword.word_id) -%}
+                {%- if word %}<a class="chip" href="#word-{{ word.id }}">{{ word.term }}</a>{% endif -%}
+              {%- endfor -%}
+            </div>
+          {%- endif -%}
+          {%- for block in section.blocks -%}{{ render_block(block) }}{%- endfor -%}
+        </section>
+      {%- endif -%}
+    {%- endfor -%}
+  </main>
+
+  {%- if document.meta.attribution -%}
+    <footer>{{ document.meta.attribution | join(" · ") }}</footer>
+  {%- endif -%}
+</div>
+<script>
+(function () {
+  document.querySelectorAll("[data-play-section]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var section = document.getElementById(button.getAttribute("data-play-section"));
+      if (!section) return;
+      var audios = Array.prototype.slice.call(section.querySelectorAll("audio"));
+      var index = 0;
+      function playNext() {
+        if (index >= audios.length) return;
+        var audio = audios[index++];
+        audio.play();
+        audio.addEventListener("ended", playNext, { once: true });
+      }
+      if (audios.length) playNext();
+    });
+  });
+})();
+</script>
+</body>
+</html>

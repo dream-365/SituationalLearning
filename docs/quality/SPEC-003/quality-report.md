@@ -228,8 +228,8 @@
 - **x.no_fabricated_refs** [core, level 2] — 是否没有捏造 SPEC 引用、depends_on 目标或 M<N>？
   - evidence `全文`: "depends_on:   - docs/architecture/system.md   - docs/specs/SPEC-001-subtitle-learning-report/spec.md updated_at: 2026-11-03"
   - normalized: "depends_on: - docs/architecture/system.md - docs/specs/SPEC-001-subtitle-learning-report/spec.md updated_at: 2026-11-03"
-  - evidence `全文`: "\| 关联资源 \| [总体架构](../../architecture/system.md)；[SPEC-001 字幕脉络与生词语音化](../SPEC-001-subtitle-learning-report/spec.md)；本地样本《文艺复兴的解放》 \|"
-  - normalized: "\| 关联资源 \| [总体架构](../../architecture/system.md);[SPEC-001 字幕脉络与生词语音化](../SPEC-001-subtitle-learning-report/spec.md);本地样本《文艺复兴的解放》 \|"
+  - evidence `全文`: "\| 关联资源 \| [总体架构](../../architecture/system.md)；SPEC-001 字幕脉络与生词语音化；本地样本《文艺复兴的解放》 \|"
+  - normalized: "\| 关联资源 \| [总体架构](../../architecture/system.md);SPEC-001 字幕脉络与生词语音化;本地样本《文艺复兴的解放》 \|"
   - rationale: 引用均指向仓库内可核实的架构文档、SPEC-001 路径与文件/提交，未出现 M<N> 或无法核实的依赖目标。
 
 ## Audit failures

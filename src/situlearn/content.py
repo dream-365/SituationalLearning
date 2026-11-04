@@ -8,6 +8,14 @@ from types import MappingProxyType
 
 from situlearn.knowledge import ContentType, NarrativeScript, ReportManifest
 
+CATEGORY_LABELS = {
+    "domain_term": "领域术语",
+    "proper_noun": "专名",
+    "work_title": "作品名",
+    "school_genre": "流派/时期",
+    "common_advanced": "低频普通词",
+}
+
 
 @dataclass(frozen=True)
 class ReportLabels:

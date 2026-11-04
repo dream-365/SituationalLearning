@@ -1,14 +1,17 @@
 ---
 type: spec
 status: Approved
+superseded_by: docs/specs/SPEC-004-presentation-format/spec.md
 owner: alang
 depends_on:
   - docs/architecture/system.md
   - docs/specs/SPEC-001-subtitle-learning-report/spec.md
-updated_at: 2026-11-03
+updated_at: 2026-11-04
 ---
 
 # 情景学习 字幕学习报告内容类型分型 技术方案
+
+> **已被 SPEC-004 部分取代（2026-11-04 生效）**：`report_key` / 发布语义不变、同一字幕双题材最后发布生效等承诺以 [SPEC-004](../SPEC-004-presentation-format/spec.md) 为准；本 spec 的内容类型 profile 与提示词策略仍有效。
 
 | 字段 | 内容 |
 | --- | --- |

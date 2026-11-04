@@ -1,7 +1,8 @@
-"""Tests for the local publish client and CLI subcommand."""
+"""Tests for the publish client and CLI subcommand."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -9,79 +10,82 @@ import httpx
 import pytest
 
 from situlearn.cli import main
+from situlearn.document import REQUIRED_LABELS
+from situlearn.packager import package_directory
 from situlearn.publish import PublishError, publish_report_dir
 
 
-def _manifest(report_key: str = "a" * 64) -> dict:
-    sections = [
-        {
-            "section_id": f"s{index}",
-            "heading": f"Heading {index}",
-            "start_ms": index * 1_000,
-            "end_ms": (index + 1) * 1_000,
-            "summary": "Section summary",
-            "key_terms": [],
-            "spoken_text": "Spoken section text",
-            "audio_refs": [f"assets/audio/s{index}.mp3"],
-            "audio_status": "ready",
-        }
-        for index in range(4)
-    ]
-    return {
-        "schema_version": "1.0.0",
-        "source": {
-            "filename": "sample.srt",
-            "sha256": report_key,
-            "duration_ms": 4_000,
-            "cue_count": 4,
-        },
-        "config": {},
-        "narrative": {
-            "title": "Publish Test Report",
-            "logline": "A publish test logline",
-            "background": "A background paragraph for the publish test.",
-            "sections": sections,
-        },
-        "terms": [
-            {
-                "term": "word",
-                "ipa": "/w/",
-                "part_of_speech": "noun",
-                "definition_zh": "中文释义内容足够长的",
-                "definition_en": "English definition text",
-                "context_sentence": "A context sentence for the term.",
-                "why_it_matters": "It matters because it blocks the argument.",
-                "section_id": "s0",
-                "category": "domain_term",
-                "audio_ref": "assets/audio/term.mp3",
-                "audio_source": "dictionary",
-                "sources": [{"name": "source", "url": "https://example.com"}],
-            }
-        ],
-        "assets": [
-            {
-                "asset_id": f"a{index}",
-                "path": f"assets/audio/s{index}.mp3",
-                "duration_ms": 1_000,
-                "text_sha256": "b" * 64,
-                "source": "tts",
-            }
-            for index in range(4)
-        ],
-        "warnings": [],
-    }
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 def _report_dir(tmp_path: Path) -> Path:
     report_dir = tmp_path / "report"
-    audio = report_dir / "assets" / "audio"
-    audio.mkdir(parents=True)
-    (report_dir / "manifest.json").write_text(
-        json.dumps(_manifest(), ensure_ascii=False), encoding="utf-8"
+    audio = b"section-audio"
+    image = b"image-bytes"
+    audio_path = report_dir / "media" / "audio" / "s0.mp3"
+    image_path = report_dir / "media" / "images" / "s0.jpg"
+    audio_path.parent.mkdir(parents=True)
+    image_path.parent.mkdir(parents=True)
+    audio_path.write_bytes(audio)
+    image_path.write_bytes(image)
+    labels = {key: f"label-{key}" for key in REQUIRED_LABELS}
+    document = {
+        "format": "situlearn.document",
+        "version": 1,
+        "meta": {
+            "id": "a" * 64,
+            "title": "Publish Test Report",
+            "language": "zh-CN",
+            "source": {
+                "filename": "sample.srt",
+                "sha256": "a" * 64,
+                "language": "en",
+                "duration_ms": 4000,
+                "cue_count": 4,
+            },
+            "labels": labels,
+            "attribution": ["Dictionary"],
+        },
+        "resources": {
+            "aud-1": {
+                "type": "audio",
+                "mime": "audio/mpeg",
+                "href": "media/audio/s0.mp3",
+                "sha256": _sha256(audio),
+                "source": "tts",
+            },
+            "img-1": {
+                "type": "image",
+                "mime": "image/jpeg",
+                "href": "media/images/s0.jpg",
+                "sha256": _sha256(image),
+            },
+        },
+        "sections": [
+            {
+                "id": "s0",
+                "role": "narrative",
+                "title": "Section",
+                "time": {"start_ms": 0, "end_ms": 4000},
+                "blocks": [
+                    {
+                        "type": "group",
+                        "role": "narration",
+                        "script": "Spoken section text",
+                        "blocks": [
+                            {"type": "image", "resource": "img-1"},
+                            {"type": "text", "text": "Section summary"},
+                            {"type": "audio", "resource": "aud-1"},
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    (report_dir / "document.json").write_text(
+        json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
-    for index in range(4):
-        (audio / f"s{index}.mp3").write_bytes(f"section-{index}".encode())
-    (audio / "term.mp3").write_bytes(b"term-audio")
     return report_dir
 
 
@@ -106,18 +110,22 @@ def test_dry_run_packages_without_network(tmp_path):
     assert result.slug is None
 
 
-def test_upload_sends_token_and_returns_result(tmp_path):
+def test_upload_sends_archive_and_requested_slug(tmp_path):
     report_dir = _report_dir(tmp_path)
-    seen: dict[str, str] = {}
+    (report_dir / "publish.json").write_text(
+        json.dumps({"slug": "old-slug"}), encoding="utf-8"
+    )
+    seen: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen["path"] = request.url.path
         seen["authorization"] = request.headers.get("authorization", "")
+        seen["body"] = request.content
         return httpx.Response(
             201,
             json={
-                "slug": "publish-test-report-abcdefghijk2",
-                "url": "https://learn.example.test/r/publish-test-report-abcdefghijk2",
+                "slug": "old-slug",
+                "url": "https://learn.example.test/r/old-slug",
                 "report_id": "report-id",
                 "version": "v1",
                 "replaced": False,
@@ -131,15 +139,51 @@ def test_upload_sends_token_and_returns_result(tmp_path):
         transport=httpx.MockTransport(handler),
     )
 
-    assert seen == {
-        "path": "/api/v1/reports",
-        "authorization": "Bearer secret",
-    }
-    assert result.slug == "publish-test-report-abcdefghijk2"
-    assert result.url.endswith("/r/publish-test-report-abcdefghijk2")
+    assert seen["path"] == "/api/v1/reports"
+    assert seen["authorization"] == "Bearer secret"
+    body = seen["body"]
+    assert isinstance(body, bytes)
+    assert b"report.situ" in body
+    assert b"requested_slug" in body
+    assert b"old-slug" in body
+    assert b"report_key" not in body
+    assert result.slug == "old-slug"
     assert result.report_id == "report-id"
     assert result.version == "v1"
     assert result.replaced is False
+
+
+def test_upload_situ_source(tmp_path):
+    report_dir = _report_dir(tmp_path)
+    package = tmp_path / "report.situ"
+    package_directory(report_dir, package)
+
+    result = publish_report_dir(
+        package,
+        "https://learn.example.test",
+        "",
+        slug="requested",
+        dry_run=True,
+    )
+
+    assert result.report_key == "a" * 64
+    assert result.slug == "requested"
+    assert result.size_bytes == package.stat().st_size
+
+
+def test_slug_argument_overrides_sidecar(tmp_path):
+    report_dir = _report_dir(tmp_path)
+    (report_dir / "publish.json").write_text(
+        json.dumps({"slug": "sidecar-slug"}), encoding="utf-8"
+    )
+    result = publish_report_dir(
+        report_dir,
+        "https://learn.example.test",
+        "",
+        slug="explicit-slug",
+        dry_run=True,
+    )
+    assert result.slug == "explicit-slug"
 
 
 def test_upload_maps_unauthorized_to_exit_code_5(tmp_path):
@@ -169,7 +213,7 @@ def test_upload_maps_rejection_to_exit_code_7(tmp_path):
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             422,
-            json={"detail": {"code": "ERR_PUBLISH_ASSET_MISSING", "message": "missing"}},
+            json={"detail": {"code": "ERR_PUBLISH_INVALID_DOCUMENT", "message": "bad"}},
         )
 
     with pytest.raises(PublishError) as captured:
@@ -181,7 +225,7 @@ def test_upload_maps_rejection_to_exit_code_7(tmp_path):
         )
 
     assert captured.value.exit_code == 7
-    assert captured.value.code == "ERR_PUBLISH_ASSET_MISSING"
+    assert captured.value.code == "ERR_PUBLISH_INVALID_DOCUMENT"
 
 
 def test_upload_maps_network_error_to_exit_code_6(tmp_path):
@@ -202,7 +246,7 @@ def test_upload_maps_network_error_to_exit_code_6(tmp_path):
     assert captured.value.code == "ERR_PUBLISH_NETWORK"
 
 
-def test_missing_manifest_is_a_local_error(tmp_path):
+def test_missing_document_is_a_local_error(tmp_path):
     report_dir = tmp_path / "empty"
     report_dir.mkdir()
 
@@ -210,11 +254,23 @@ def test_missing_manifest_is_a_local_error(tmp_path):
         publish_report_dir(report_dir, "https://learn.example.test", "", dry_run=True)
 
     assert captured.value.exit_code == 2
+    assert captured.value.code == "ERR_LOCAL_DOCUMENT"
 
 
 def test_missing_asset_is_a_local_error(tmp_path):
     report_dir = _report_dir(tmp_path)
-    (report_dir / "assets" / "audio" / "s2.mp3").unlink()
+    (report_dir / "media" / "audio" / "s0.mp3").unlink()
+
+    with pytest.raises(PublishError) as captured:
+        publish_report_dir(report_dir, "https://learn.example.test", "", dry_run=True)
+
+    assert captured.value.exit_code == 2
+    assert captured.value.code == "document/missing-resource"
+
+
+def test_invalid_document_is_a_local_error(tmp_path):
+    report_dir = _report_dir(tmp_path)
+    (report_dir / "document.json").write_text("{}", encoding="utf-8")
 
     with pytest.raises(PublishError) as captured:
         publish_report_dir(report_dir, "https://learn.example.test", "", dry_run=True)

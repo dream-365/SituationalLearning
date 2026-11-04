@@ -44,15 +44,15 @@ spec:
                 secretKeyRef:
                   name: situlearn-secrets
                   key: OSS_ACCESS_KEY_ID
+                  optional: true
             - name: OSS_ACCESS_KEY_SECRET
               valueFrom:
                 secretKeyRef:
                   name: situlearn-secrets
                   key: OSS_ACCESS_KEY_SECRET
+                  optional: true
             - name: SITULEARN_DATA_DIR
               value: /data
-            - name: SITULEARN_BACKUP_DIR
-              value: /backup
             - name: SITULEARN_STAGING_DIR
               value: /staging
           livenessProbe:

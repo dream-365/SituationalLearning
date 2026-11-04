@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import logging
-import mimetypes
 import os
 import tempfile
 import time
@@ -15,7 +15,12 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+)
 from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
 from starlette.responses import Response, StreamingResponse
 from starlette.staticfiles import StaticFiles
@@ -145,7 +150,7 @@ async def cleanup_expired_versions(
 
     removed = 0
     for version in repository.expired_versions(ttl_hours):
-        await run_in_threadpool(store.remove_version, version.report_id, version.version)
+        await run_in_threadpool(store.remove_prefix, version.object_prefix)
         repository.mark_version_deleted(version.report_id, version.version)
         removed += 1
     return removed
@@ -203,7 +208,22 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
     app.state.repository = repository
     try:
         resolved.ensure_directories()
-        app.state.repository.initialize()
+        token_hash = (
+            hashlib.sha256(resolved.publish_token.encode()).hexdigest()
+            if resolved.publish_token
+            else None
+        )
+        app.state.repository.initialize(
+            bootstrap_owner_id=resolved.default_owner_id,
+            bootstrap_name=resolved.owner_name,
+            bootstrap_token_hash=token_hash,
+        )
+        for token, owner_id in resolved.publish_tokens.items():
+            app.state.repository.seed_owner(
+                owner_id,
+                owner_id,
+                hashlib.sha256(token.encode()).hexdigest(),
+            )
     except OSError:
         # /readyz reports the broken data directory; API calls will fail with 503.
         pass
@@ -366,25 +386,58 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
             headers={"X-Robots-Tag": "noindex, nofollow"},
         )
 
-    @app.get("/r/{slug}/assets/{asset_path:path}")
-    async def report_asset(slug: str, asset_path: str, request: Request) -> Response:
+    @app.get("/r/{slug}/document.json")
+    async def report_document(slug: str, request: Request) -> Response:
         report = _public_report(request, slug)
+        store: ReportStore = request.app.state.store
+        data = await run_in_threadpool(store.read_document, report.version_prefix)
+        return Response(
+            content=data,
+            media_type="application/json",
+            headers={
+                "X-Robots-Tag": "noindex, nofollow",
+                "Cache-Control": "no-cache",
+            },
+        )
+
+    @app.get("/r/{slug}/assets/{asset_path:path}")
+    async def legacy_asset(slug: str, asset_path: str) -> RedirectResponse:
+        return RedirectResponse(
+            url=f"/r/{slug}/media/{asset_path}",
+            status_code=308,
+        )
+
+    @app.get("/r/{slug}/media/{asset_path:path}")
+    async def report_media(slug: str, asset_path: str, request: Request) -> Response:
+        report = _public_report(request, slug)
+        href = f"media/{asset_path}"
+        resource = next(
+            (
+                candidate
+                for candidate in report.document.resources.values()
+                if candidate.href == href
+            ),
+            None,
+        )
+        if resource is None:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "code": "ERR_REPORT_NOT_FOUND",
+                    "message": f"unknown media: {asset_path}",
+                },
+            )
         store: ReportStore = request.app.state.store
         try:
             size = await run_in_threadpool(
-                store.asset_size, report.version_prefix, asset_path
+                store.asset_size, report.version_prefix, href
             )
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=400,
-                detail={"code": "ERR_ASSET_PATH_INVALID", "message": "invalid asset path"},
-            ) from exc
         except ObjectNotFound as exc:
             raise HTTPException(
                 status_code=404,
                 detail={
                     "code": "ERR_REPORT_NOT_FOUND",
-                    "message": f"unknown asset: {asset_path}",
+                    "message": f"unknown media: {asset_path}",
                 },
             ) from exc
         except ObjectStoreError as exc:
@@ -410,25 +463,31 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
                 "Accept-Ranges": "bytes",
                 "Content-Length": str(end - start + 1),
                 "Content-Range": f"bytes {start}-{end}/{size}",
+                "X-Content-Type-Options": "nosniff",
             }
         else:
             start, end = 0, size - 1
             status_code = 200
-            headers = {"Accept-Ranges": "bytes", "Content-Length": str(size)}
+            headers = {
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(size),
+                "X-Content-Type-Options": "nosniff",
+            }
 
         if size == 0:
-            return Response(status_code=status_code, media_type="application/octet-stream", headers=headers)
+            return Response(
+                status_code=status_code,
+                media_type=resource.mime,
+                headers=headers,
+            )
 
         iterator = await run_in_threadpool(
-            store.read_asset_range, report.version_prefix, asset_path, start, end
-        )
-        media_type = (
-            mimetypes.guess_type(asset_path)[0] or "application/octet-stream"
+            store.read_asset_range, report.version_prefix, href, start, end
         )
         return StreamingResponse(
             iterate_in_threadpool(iterator),
             status_code=status_code,
-            media_type=media_type,
+            media_type=resource.mime,
             headers=headers,
         )
 

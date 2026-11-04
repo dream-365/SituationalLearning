@@ -49,8 +49,11 @@ def test_base_contains_required_resources():
         for document in _documents()
         if document.get("kind") == "PersistentVolumeClaim"
     ]
-    assert len(pvcs) == 1
-    assert {pvc["metadata"]["name"] for pvc in pvcs} == {"situlearn-data"}
+    assert len(pvcs) == 2
+    assert {pvc["metadata"]["name"] for pvc in pvcs} == {
+        "situlearn-data",
+        "situlearn-backup",
+    }
 
 
 def test_deployment_has_probes_resources_and_storage():
@@ -114,8 +117,14 @@ def test_backup_cronjob_snapshots_database_to_oss():
     assert container["command"][-1] == "situlearn.web.backup"
     assert "--keep-days" in container["args"]
     mounts = {mount["mountPath"] for mount in container["volumeMounts"]}
-    assert "/data" in mounts
-    assert "/backup" not in mounts
+    assert {"/data", "/backup", "/tmp"}.issubset(mounts)
+    volumes = {
+        volume["name"]: volume
+        for volume in cronjob["spec"]["jobTemplate"]["spec"]["template"]["spec"][
+            "volumes"
+        ]
+    }
+    assert volumes["backup"]["persistentVolumeClaim"]["claimName"] == "situlearn-backup"
     env_sources = container["envFrom"]
     assert any("configMapRef" in item for item in env_sources)
     assert any("secretRef" in item for item in env_sources)

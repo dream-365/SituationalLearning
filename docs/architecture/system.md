@@ -3,10 +3,12 @@ type: architecture
 status: Approved
 owner: alang
 depends_on: []
-updated_at: 2026-11-03
+updated_at: 2026-11-04
 ---
 
 # 情景学习 总体架构
+
+> **部分被 SPEC-004 取代（2026-11-04 生效）**：正式产物改为 `document.json` + `media/`（可选派生 `index.html` 与 `.situ` 包）；`manifest.json` / `report.html` 不再是正式产物。报告格式、离线/在线资源解析、发布与 owner 契约以 [SPEC-004](../specs/SPEC-004-presentation-format/spec.md) 为准。本文件其余架构描述仍有效。
 
 ## 1. 系统定位
 
@@ -20,7 +22,7 @@ updated_at: 2026-11-03
 ## 2. 系统边界与运行形态
 
 - **运行形态**：本地 CLI。用户在终端执行一次构建命令，产物写入指定目录。
-- **产物形态**：一个报告目录，包含 `report.html`、`assets/audio/` 与 `manifest.json`。HTML 通过相对路径引用音频，不依赖本地服务或外部网络。
+- **产物形态**：一个报告目录，包含 `document.json`、`media/`，默认还生成派生的 `index.html`；`.situ` 是可选的 zip 容器。HTML 通过相对路径引用媒体，不依赖本地服务或外部网络。
 - **输入**：单语英文 `.srt` 字幕，以及题材参数 `documentary` / `movie`。`.vtt`、双语字幕、多集合并属于后续阶段。
 - **外部依赖**：Claude Messages API（脉络梳理与术语抽取）、免费词典接口（音标、释义、真人发音）、云端 TTS（脉络播报与词典缺失时的发音兜底）。
 
@@ -36,19 +38,25 @@ updated_at: 2026-11-03
 | Lexicon Enricher | 查询词典接口补齐音标、英英释义与真人发音；中文释义由 Claude 结合语境生成；词典缺失时标记 TTS 兜底。 |
 | TTS Provider | 可替换的语音合成接口，默认云端实现；按章节与词条生成音频。 |
 | Audio Cache | 以文本与语音参数的哈希为键缓存音频，保证重跑不重复付费。 |
-| Report Assembler | 把 manifest 渲染为离线 HTML，绑定章节音频、词条发音与上下文定位。 |
-| CLI Orchestrator | 解析参数、编排阶段、管理缓存、汇总错误与运行日志。 |
+| Document Compiler | 把生成数据与媒体编译成 `document.json` + `media/`；写 ID、`href`、资源哈希与标签。 |
+| Resolver | 以文档位置为 base 解析 `media/...`：目录、`.situ` zip、HTTP 三种模式。 |
+| Packager | 只打包 `document.json` + 被引用资源，做路径安全、限额、确定性、哈希校验。 |
+| Document Renderer | 按 block 类型渲染离线 HTML；不按内容类型分支。 |
+| Publisher / Web | owner 隔离发布、严格文档校验、公开投影、`/document.json` 与 `/media` 路由。 |
+| CLI Orchestrator | 解析参数、编排 build/render/package/migrate/publish、管理缓存与错误。 |
 
 ## 4. 数据与隐私
 
 - 字幕内容只发送给用户显式配置的 LLM 与 TTS 服务，不经过本系统的任何中转服务。
-- API Key 从环境变量读取，不写入 `manifest.json`、HTML 或运行日志。
+- API Key 从环境变量读取，不写入 `document.json`、HTML 或运行日志。
 - 生成物不包含外部脚本、字体或图片链接；HTML 设置内容安全策略，禁止运行时访问网络。
-- 词典音频下载后落盘，报告页脚保留词典来源署名。
+- 词典音频下载后落盘；`meta.attribution` 保留词典/TTS 署名。
+- 公开 `document.json` 是 canonical 文档的投影，移除 `meta.id`、`meta.source.filename` 与 `meta.source.sha256`。
 
 ## 5. 演进约束
 
 - 新增字幕格式只扩展 Subtitle Parser，不修改下游阶段的数据契约。
 - 更换 TTS 供应商只替换 TTS Provider 实现，缓存键包含供应商与音色，避免串音。
-- 更换 LLM 模型不改变 manifest 结构；模型标识写入 manifest 以便追溯。
-- 报告结构遵循 `manifest.schema_version`，读取端对新增字段保持向后兼容。
+- 更换 LLM 模型不改变 document 结构；`meta.generator` 记录生成器版本。
+- 报告结构遵循 `document.version`，读取端对新增可选字段保持向后兼容；破坏性变更升主版本。
+- 新增内容类型只新增 ContentProfile 与默认 block 组合；文档格式与 Renderer 不改。

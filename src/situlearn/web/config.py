@@ -46,6 +46,28 @@ def _default_backup_dir() -> Path:
     return Path.home() / ".cache" / "situlearn" / "backup"
 
 
+def _env_owner_tokens(env: Mapping[str, str]) -> dict[str, str]:
+    raw = env.get("PUBLISH_TOKENS", "")
+    if not raw:
+        return {}
+    import json
+
+    try:
+        payload = json.loads(raw)
+    except ValueError as exc:
+        raise ValueError("PUBLISH_TOKENS must be a JSON object") from exc
+    if not isinstance(payload, dict):
+        raise TypeError("PUBLISH_TOKENS must be a JSON object")
+    tokens: dict[str, str] = {}
+    for token, owner_id in payload.items():
+        if not isinstance(token, str) or not token:
+            raise ValueError("PUBLISH_TOKENS keys must be non-empty strings")
+        if not isinstance(owner_id, str) or not owner_id:
+            raise ValueError("PUBLISH_TOKENS values must be non-empty owner ids")
+        tokens[token] = owner_id
+    return tokens
+
+
 @dataclass(frozen=True)
 class Settings:
     """All runtime settings, resolved once at process start."""
@@ -54,6 +76,9 @@ class Settings:
     backup_dir: Path = field(default_factory=_default_backup_dir)
     site_base_url: str = "http://localhost:8000"
     publish_token: str = ""
+    publish_tokens: dict[str, str] = field(default_factory=dict)
+    default_owner_id: str = "owner-0001"
+    owner_name: str = "default"
     publish_enabled: bool = True
     max_report_bytes: int = 100 * 1024 * 1024
     max_report_files: int = 2_000
@@ -77,11 +102,19 @@ class Settings:
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
         source = os.environ if env is None else env
+        default_owner_id = source.get("DEFAULT_OWNER_ID", "owner-0001")
+        publish_token = source.get("PUBLISH_TOKEN", "")
+        tokens = _env_owner_tokens(source)
+        if not tokens and publish_token:
+            tokens = {publish_token: default_owner_id}
         return cls(
             data_dir=_env_path(source, "SITULEARN_DATA_DIR", _default_data_dir()),
             backup_dir=_env_path(source, "SITULEARN_BACKUP_DIR", _default_backup_dir()),
             site_base_url=source.get("SITE_BASE_URL", "http://localhost:8000").rstrip("/"),
-            publish_token=source.get("PUBLISH_TOKEN", ""),
+            publish_token=publish_token,
+            publish_tokens=tokens,
+            default_owner_id=default_owner_id,
+            owner_name=source.get("OWNER_NAME", "default"),
             publish_enabled=_env_bool(source, "PUBLISH_ENABLED", True),
             max_report_bytes=_env_int(
                 source, "MAX_REPORT_BYTES", 100 * 1024 * 1024

@@ -33,11 +33,15 @@ spec:
                 - /data
                 - --keep-days
                 - "30"
+              env:
+                - name: SITULEARN_BACKUP_DIR
+                  value: /backup
               envFrom:
                 - configMapRef:
                     name: situlearn-config
                 - secretRef:
                     name: situlearn-secrets
+                    optional: true
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
@@ -47,11 +51,16 @@ spec:
               volumeMounts:
                 - name: data
                   mountPath: /data
+                - name: backup
+                  mountPath: /backup
                 - name: tmp
                   mountPath: /tmp
           volumes:
             - name: data
               persistentVolumeClaim:
                 claimName: situlearn-data
+            - name: backup
+              persistentVolumeClaim:
+                claimName: situlearn-backup
             - name: tmp
               emptyDir: {}
