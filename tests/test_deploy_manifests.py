@@ -113,7 +113,7 @@ def test_backup_cronjob_snapshots_database_to_oss():
     container = cronjob["spec"]["jobTemplate"]["spec"]["template"]["spec"][
         "containers"
     ][0]
-    assert container["image"] == "situlearn-web:0.2.2"
+    assert container["image"] == "situlearn-web:0.4.0"
     assert container["command"][-1] == "situlearn.web.backup"
     assert "--keep-days" in container["args"]
     mounts = {mount["mountPath"] for mount in container["volumeMounts"]}
@@ -152,7 +152,7 @@ def test_overlay_pins_image_tag_and_host():
     overlay = yaml.safe_load(
         (OVERLAY / "kustomization.yaml").read_text(encoding="utf-8")
     )
-    assert overlay["images"][0]["newTag"] == "0.2.2"
+    assert overlay["images"][0]["newTag"] == "0.4.0"
     assert overlay["namespace"] == "situlearn"
     patch_text = "\n".join(item["patch"] for item in overlay["patches"])
     assert "situlearn.example.com" in patch_text
