@@ -9,6 +9,8 @@ updated_at: 2026-11-02
 
 # 情景学习 字幕脉络与生词语音化 技术方案
 
+> **部分被 SPEC-004 取代（2026-11-04）**：正式产物改为 `document.json` + `media/`（可选派生 `index.html` / `.situ`）；`manifest.json` / `report.html` 不再是正式产物。本 spec 的字幕解析、切分、叙事、词条、词典与音频生成部分仍有效；展示与发布契约以 [SPEC-004](../SPEC-004-presentation-format/spec.md) 为准。
+
 | 字段 | 内容 |
 | --- | --- |
 | 标题 | 情景学习 字幕脉络与生词语音化 技术方案 |

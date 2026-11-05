@@ -118,14 +118,16 @@ def gloss_terms(
                     why_it_matters=term.why_it_matters,
                     section_id=term.section_id,
                     category=term.category,
-                    sources=[
-                        SourceRef(
-                            name="Wiktionary via dictionaryapi.dev"
-                            if entry
-                            else "DeepSeek 语境释义",
-                            url=entry.source_url if entry else "https://api.deepseek.com",
-                        )
-                    ],
+                    sources=(
+                        [
+                            SourceRef(
+                                name="Wiktionary via dictionaryapi.dev",
+                                url=entry.source_url,
+                            )
+                        ]
+                        if entry
+                        else []
+                    ),
                 )
             )
         except ValidationError:

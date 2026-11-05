@@ -1,8 +1,7 @@
-"""Publish and lifecycle API for SituLearn reports."""
+"""Publish and lifecycle API for SituLearn document reports."""
 
 from __future__ import annotations
 
-import re
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -21,6 +20,7 @@ from situlearn.web.repository import (
     ReportRecord,
     ReportRepository,
     report_id_for,
+    valid_slug,
 )
 from situlearn.web.storage import (
     PublishValidationError,
@@ -32,11 +32,12 @@ router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_publish_token
 _VALIDATION_STATUS = {
     "ERR_PUBLISH_PAYLOAD_TOO_LARGE": 413,
     "ERR_PUBLISH_INVALID_ARCHIVE": 400,
-    "ERR_PUBLISH_MANIFEST_INVALID": 422,
-    "ERR_PUBLISH_SCHEMA_UNSUPPORTED": 422,
+    "ERR_PUBLISH_INVALID_DOCUMENT": 422,
     "ERR_PUBLISH_ASSET_MISSING": 422,
+    "ERR_PUBLISH_HASH_MISMATCH": 422,
     "ERR_PUBLISH_CONFLICT": 409,
-    "ERR_PUBLISH_STORAGE_FULL": 507,
+    "ERR_PUBLISH_INVALID_SLUG": 422,
+    "ERR_REPORT_LIMIT": 409,
     "ERR_STORAGE_UNAVAILABLE": 503,
 }
 
@@ -51,6 +52,10 @@ def _repository(request: Request) -> ReportRepository:
 
 def _store(request: Request) -> ReportStore:
     return request.app.state.store
+
+
+def _owner(request: Request) -> str:
+    return request.state.owner_id
 
 
 def _error(status_code: int, code: str, message: str) -> HTTPException:
@@ -75,7 +80,7 @@ def _new_version() -> str:
 
 async def _save_upload(upload: UploadFile, settings: Settings) -> Path:
     settings.ensure_directories()
-    path = settings.staging_dir / f"upload-{uuid.uuid4().hex}.tar.gz"
+    path = settings.staging_dir / f"upload-{uuid.uuid4().hex}.situ"
     total = 0
     try:
         with path.open("wb") as handle:
@@ -107,7 +112,7 @@ def _report_json(record: ReportRecord, settings: Settings) -> dict[str, object]:
         "created_at": record.created_at,
         "updated_at": record.updated_at,
         "size_bytes": record.size_bytes,
-        "manifest_schema_version": record.manifest_schema_version,
+        "document_schema_version": record.document_schema_version,
     }
 
 
@@ -115,15 +120,15 @@ def _report_json(record: ReportRecord, settings: Settings) -> dict[str, object]:
 async def publish_report(
     request: Request,
     archive: Annotated[UploadFile, File()],
-    report_key: Annotated[str, Form()],
-    schema_version: Annotated[str, Form()],
+    requested_slug: Annotated[str | None, Form()] = None,
 ) -> JSONResponse:
     settings = _settings(request)
     repository = _repository(request)
     store = _store(request)
+    owner_id = _owner(request)
     request_id = get_request_id()
     client_ip = request.client.host if request.client else "unknown"
-    ip_hash = hash_client_ip(client_ip, settings.publish_token)
+    ip_hash = hash_client_ip(client_ip, settings.publish_token or owner_id)
 
     allowed, retry_after = request.app.state.publish_limiter.allow(client_ip)
     if not allowed:
@@ -137,34 +142,23 @@ async def publish_report(
             headers={"Retry-After": str(retry_after)},
         )
 
-    if not re.fullmatch(r"[0-9a-f]{64}", report_key):
+    if requested_slug is not None and not valid_slug(requested_slug):
         request.app.state.metrics.record_publish("rejected")
         raise _error(
             422,
-            "ERR_PUBLISH_MANIFEST_INVALID",
-            "report_key must be 64 lowercase hexadecimal characters",
-        )
-    if not schema_version or schema_version.split(".", 1)[0] != "1":
-        request.app.state.metrics.record_publish("rejected")
-        raise _error(
-            422,
-            "ERR_PUBLISH_SCHEMA_UNSUPPORTED",
-            f"unsupported schema version: {schema_version}",
+            "ERR_PUBLISH_INVALID_SLUG",
+            "requested_slug must match [a-z0-9][a-z0-9-]{0,63}",
         )
 
-    existing = repository.get_by_key(report_key)
-    expected_version = existing.current_version if existing else None
-    report_id = existing.report_id if existing else report_id_for(report_key)
     archive_path: Path | None = None
+    staged = None
     try:
         archive_path = await _save_upload(archive, settings)
-        staged = await run_in_threadpool(
-            store.stage, archive_path, report_key=report_key
-        )
+        staged = await run_in_threadpool(store.stage, archive_path, owner_id=owner_id)
     except PublishValidationError as exc:
         request.app.state.metrics.record_publish("rejected")
         repository.record_event(
-            report_id=existing.report_id if existing else None,
+            report_id=None,
             request_id=request_id,
             action="publish",
             result="rejected",
@@ -174,25 +168,52 @@ async def publish_report(
         raise _validation_error(exc) from exc
     except ObjectStoreError as exc:
         request.app.state.metrics.record_publish("failed")
-        repository.record_event(
-            report_id=existing.report_id if existing else None,
-            request_id=request_id,
-            action="publish",
-            result="failed",
-            client_ip_hash=ip_hash,
-            error_code="ERR_STORAGE_UNAVAILABLE",
-        )
         raise _error(503, "ERR_STORAGE_UNAVAILABLE", str(exc)) from exc
     finally:
         if archive_path is not None:
             archive_path.unlink(missing_ok=True)
 
+    existing = repository.get_by_key(owner_id, staged.report_key)
+    if (
+        existing is None
+        and repository.count_owner_reports(owner_id) >= settings.max_reports
+    ):
+        store.abort(staged)
+        request.app.state.metrics.record_publish("rejected")
+        raise _error(
+            409,
+            "ERR_REPORT_LIMIT",
+            f"owner has reached the report limit ({settings.max_reports})",
+        )
+    expected_version = existing.current_version if existing else None
+    report_id = (
+        existing.report_id
+        if existing is not None
+        else report_id_for(owner_id, staged.report_key)
+    )
     version = _new_version()
+    installed = None
     try:
         installed = await run_in_threadpool(
             store.install, staged, report_id=report_id, version=version
         )
+        record = repository.finish_publish(
+            owner_id=owner_id,
+            report_key=staged.report_key,
+            title=staged.title,
+            version=version,
+            object_prefix=installed.object_prefix,
+            document_sha256=staged.document_sha256,
+            size_bytes=staged.size_bytes,
+            schema_version=staged.schema_version,
+            expected_current_version=expected_version,
+            requested_slug=requested_slug,
+            request_id=request_id,
+            client_ip_hash=ip_hash,
+        )
     except PublishValidationError as exc:
+        if installed is not None:
+            store.remove_prefix(installed.object_prefix)
         store.abort(staged)
         request.app.state.metrics.record_publish("rejected")
         repository.record_event(
@@ -204,34 +225,9 @@ async def publish_report(
             error_code=exc.code,
         )
         raise _validation_error(exc) from exc
-    except ObjectStoreError as exc:
-        store.abort(staged)
-        request.app.state.metrics.record_publish("failed")
-        repository.record_event(
-            report_id=existing.report_id if existing else None,
-            request_id=request_id,
-            action="publish",
-            result="failed",
-            client_ip_hash=ip_hash,
-            error_code="ERR_STORAGE_UNAVAILABLE",
-        )
-        raise _error(503, "ERR_STORAGE_UNAVAILABLE", str(exc)) from exc
-
-    try:
-        record = repository.finish_publish(
-            report_key=report_key,
-            title=staged.title,
-            version=version,
-            object_prefix=installed.object_prefix,
-            manifest_sha256=staged.manifest_sha256,
-            size_bytes=staged.size_bytes,
-            schema_version=staged.schema_version,
-            expected_current_version=expected_version,
-            request_id=request_id,
-            client_ip_hash=ip_hash,
-        )
     except PublishConflict as exc:
-        store.remove_version(report_id, version)
+        if installed is not None:
+            store.remove_prefix(installed.object_prefix)
         request.app.state.metrics.record_publish("rejected")
         repository.record_event(
             report_id=existing.report_id if existing else None,
@@ -242,17 +238,16 @@ async def publish_report(
             error_code="ERR_PUBLISH_CONFLICT",
         )
         raise _error(409, "ERR_PUBLISH_CONFLICT", str(exc)) from exc
-    except Exception as exc:
-        store.remove_version(report_id, version)
+    except ObjectStoreError as exc:
+        if installed is not None:
+            store.remove_prefix(installed.object_prefix)
         request.app.state.metrics.record_publish("failed")
-        repository.record_event(
-            report_id=existing.report_id if existing else None,
-            request_id=request_id,
-            action="publish",
-            result="failed",
-            client_ip_hash=ip_hash,
-            error_code="ERR_PUBLISH_DB_BUSY",
-        )
+        raise _error(503, "ERR_STORAGE_UNAVAILABLE", str(exc)) from exc
+    except Exception as exc:
+        if installed is not None:
+            store.remove_prefix(installed.object_prefix)
+        store.abort(staged)
+        request.app.state.metrics.record_publish("failed")
         raise _error(503, "ERR_PUBLISH_DB_BUSY", str(exc)) from exc
 
     request.app.state.metrics.record_publish("success")
@@ -270,19 +265,35 @@ async def unpublish_report(slug: str, request: Request) -> Response:
     repository = _repository(request)
     client_ip = request.client.host if request.client else "unknown"
     record = repository.unpublish(
+        _owner(request),
         slug,
         request_id=get_request_id(),
-        client_ip_hash=hash_client_ip(client_ip, _settings(request).publish_token),
+        client_ip_hash=hash_client_ip(
+            client_ip, _settings(request).publish_token or _owner(request)
+        ),
     )
     if record is None:
         raise _error(404, "ERR_REPORT_NOT_FOUND", f"unknown report: {slug}")
     return Response(status_code=204)
 
 
+@router.get("/reports")
+async def list_reports(request: Request) -> dict[str, object]:
+    repository = _repository(request)
+    settings = _settings(request)
+    records = repository.list_reports(_owner(request))
+    return {
+        "reports": [_report_json(record, settings) for record in records],
+        "count": len(records),
+    }
+
+
 @router.get("/reports/{slug}")
 async def get_report(slug: str, request: Request) -> dict[str, object]:
     repository = _repository(request)
-    record = repository.get_by_slug(slug, include_unpublished=True)
+    record = repository.get_by_slug(
+        _owner(request), slug, include_unpublished=True
+    )
     if record is None:
         raise _error(404, "ERR_REPORT_NOT_FOUND", f"unknown report: {slug}")
     return _report_json(record, _settings(request))

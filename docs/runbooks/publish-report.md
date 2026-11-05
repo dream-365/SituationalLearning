@@ -1,209 +1,32 @@
-# 学习报告发布 Runbook（发布清单）
+# 学习报告发布与迁移 Runbook
 
-适用版本：situlearn 0.2.2（web 发布层）
-最后验证：2026-11-03，本机 macOS + 局域网 HTTPS，已验证 `/healthz` 200、报告首页 200、音频 Range 206。
-相关清单：[iPad 真机冒烟](ipad-smoke.md)
+适用版本：situlearn 0.2.2 + SPEC-004 文档格式
+最后验证：2026-11-04（本机 HTTP、真实 913-cue 样本、document/media 路由）
+相关：[iPad 真机冒烟](ipad-smoke.md)、[部署配置](../../deploy/README.md)
 
-本文覆盖三种发布路径，按使用频率排序：
+> 旧版 `manifest.json + assets/` 发布流程已废弃。发布输入是 **document 目录**或 `.situ`；
+> 公开媒体路由是 `/r/<slug>/media/...`，旧 `/r/<slug>/assets/...` 仅做 308 重定向。
 
-1. **方式 A：局域网 HTTPS**（本机直接发布到 iPad，已验证；日常使用）
-2. **方式 B：公网 K3s**（真正的公网 URL，需要域名、集群与镜像仓库）
-3. **方式 C：本机 HTTP 开发**（只在本机浏览器验证，不用于 iPad）
+## 0. 前置检查
 
----
-
-## 0. 当前环境速查
-
-上次发布留下并已验证可用的路径：
-
-| 项目 | 路径 / 值 |
-| --- | --- |
-| 报告目录 | `reports/renaissance-p01-v1` |
-| 报告标题 | 被删掉的北方文艺复兴（8 章 / 69 词条 / 77 个音频） |
-| 已发布 slug | `report-ve64nmjnfqdy` |
-| 本机局域网 IP | `192.0.2.10` |
-| 服务数据目录 | `~/.cache/situlearn/lan-web-data-20261102` |
-| 发布令牌文件 | `~/.cache/situlearn/lan-tls/publish_token` |
-| TLS 证书 | `~/.cache/situlearn/lan-tls/server.crt`、`server.key`（有效期至 2027-11-02） |
-| iPad 安装用 CA | `~/.cache/situlearn/lan-tls/public/situlearn-ca.crt` |
-
-> 关键点：**只要 `SITULEARN_DATA_DIR` 指向上面那个数据目录，重复发布就会命中同一条报告，slug 和 URL 都不变。** 换数据目录会生成新 slug，旧 URL 随即失效。
-
-> 内容类型：纪录片默认构建；电影用 `uv run situlearn build <movie.srt> --content-type movie --out reports/<name>-movie`。发布键只取字幕 SHA-256，因此同一份字幕先发纪录片再发电影会覆盖同一个 slug/URL，最后一次发布生效。需要同时保留两版时，请使用不同字幕文件或等待后续复合发布键支持。
-
----
-
-## 1. 发布前检查清单
-
-- [ ] 用的是 **源码目录里的 0.2.2**，不是已安装的 v0.1.3 wheel：v0.1.3 不含 `publish` 子命令。
-- [ ] `uv run situlearn publish <报告目录> --server <URL> --dry-run` 通过（只校验和打包，不联网）。
-- [ ] 报告目录包含 `manifest.json` 与 `assets/audio/`，且 manifest 引用的音频都存在。
-- [ ] 服务进程在跑，且 `SITE_BASE_URL` 与 iPad 实际访问的地址一致。
-- [ ] 发布令牌与服务端 `PUBLISH_TOKEN` 一致。
+- [ ] `document.json` 存在，且 `resources[*].href` 都指向 `media/...`
+- [ ] 媒体文件存在，`resources[*].sha256` 与实际字节一致
+- [ ] 25 个 `meta.labels` 键完整（build/migrate 自动填充）
+- [ ] `meta.source.sha256` 或 `meta.id` 是 64 位小写 hex
+- [ ] 服务端与发布端使用同一个 token；多 owner 时 token 在 `PUBLISH_TOKENS` 中
+- [ ] `SITE_BASE_URL` 与 iPad/浏览器实际访问地址一致
 
 快速自检：
 
 ```bash
-cd /Users/alang/Workspace/Situational-Eng-Learning
-uv run situlearn --version
-uv run situlearn publish reports/renaissance-p01-v1 \
-  --server https://192.0.2.10:8443 --dry-run
+uv run situlearn publish reports/demo --server https://host --dry-run
 ```
 
-期望输出形如：
-
-```text
-dry-run: report_key=... title=被删掉的北方文艺复兴 size=6668075
-```
+期望看到 `dry-run: report_key=... title=... size=... slug=...`。
 
 ---
 
-## 2. 方式 A：局域网 HTTPS 发布（日常路径）
-
-iPad 需要 HTTPS 才能注册 Service Worker、添加到主屏幕并离线缓存；用 Mac 的局域网 IP + 本地 CA 即可，不必部署集群。
-
-### 2.1 启动服务（终端 1）
-
-```bash
-cd /Users/alang/Workspace/Situational-Eng-Learning
-
-export PUBLISH_TOKEN="$(cat "$HOME/.cache/situlearn/lan-tls/publish_token")"
-export SITE_BASE_URL="https://192.0.2.10:8443"
-export SITULEARN_DATA_DIR="$HOME/.cache/situlearn/lan-web-data-20261102"
-
-uv run uvicorn situlearn.web.app:app \
-  --host 0.0.0.0 \
-  --port 8443 \
-  --ssl-keyfile "$HOME/.cache/situlearn/lan-tls/server.key" \
-  --ssl-certfile "$HOME/.cache/situlearn/lan-tls/server.crt"
-```
-
-验证服务：
-
-```bash
-curl -ksS -o /dev/null -w "healthz=%{http_code}\n" https://192.0.2.10:8443/healthz
-curl -ksS -o /dev/null -w "report=%{http_code}\n" https://192.0.2.10:8443/r/report-ve64nmjnfqdy
-```
-
-- 期望：`healthz=200`、`report=200`。
-- 服务必须**一直开着**；终端关闭、Mac 睡眠或换 Wi-Fi 都会让 iPad 打不开。要长时间挂着可以另开一个终端执行 `caffeinate -s`。
-
-### 2.2 发布报告（终端 2）
-
-```bash
-cd /Users/alang/Workspace/Situational-Eng-Learning
-
-SITULEARN_PUBLISH_TOKEN="$(cat "$HOME/.cache/situlearn/lan-tls/publish_token")" \
-  uv run situlearn publish reports/renaissance-p01-v1 \
-  --server https://192.0.2.10:8443
-```
-
-期望输出：
-
-```text
-published: https://192.0.2.10:8443/r/report-ve64nmjnfqdy
-slug=report-ve64nmjnfqdy version=... replaced=True
-```
-
-- `replaced=True` 表示覆盖了同一份报告的旧版本，URL 不变。
-- 换一份字幕构建的新报告会得到新 `report_key`，因此是新 slug。
-- 发布是“先上传新版本、再原子切换”；中途失败不会破坏当前可访问的旧版本。
-
-### 2.3 iPad 打开
-
-Safari 打开：
-
-```text
-https://192.0.2.10:8443/r/report-ve64nmjnfqdy
-```
-
-首次使用或换 iPad 时，需要让 iPad 信任本地 CA：
-
-1. 让 iPad 能下载 `situlearn-ca.crt`（AirDrop 最省事；或临时起一个 HTTP 服务）：
-   ```bash
-   python3 -m http.server 8444 \
-     --directory "$HOME/.cache/situlearn/lan-tls/public"
-   ```
-   iPad Safari 打开 `http://192.0.2.10:8444/situlearn-ca.crt` 并安装描述文件。
-2. iPad 设置 → 通用 → 关于本机 → 证书信任设置 → 打开 “SituLearn Local CA” 完全信任。
-3. 重新打开报告 URL，确认没有证书警告。
-
-完整播放验收见 [iPad 真机冒烟](ipad-smoke.md)。
-
-### 2.4 停止服务
-
-终端 1 按 `Ctrl+C`。
-
----
-
-## 3. 方式 B：公网 K3s 发布
-
-目标：把报告发布到 `https://<你的域名>/r/<slug>`，不再依赖 Mac 开机。
-
-### 3.1 部署前准备
-
-- [ ] 一个真实域名，DNS 指向 K3s 入口。
-- [ ] Traefik Ingress 可用；TLS 证书（cert-manager 或已有 Secret `situlearn-tls`）。
-- [ ] 可用的镜像仓库，能推送 `ghcr.io/dream-365/situlearn-web:<tag>`。
-- [ ] 本机有 `kubectl` 和容器构建工具（当前 Mac 上两者都未安装）。
-- [ ] 把 `deploy/k8s/overlays/prod/kustomization.yaml` 里的 `situlearn.example.com` 换成真实域名，`SITE_BASE_URL` 同步替换。
-
-### 3.2 构建并推送镜像
-
-```bash
-docker build -t ghcr.io/dream-365/situlearn-web:0.2.2 .
-docker push ghcr.io/dream-365/situlearn-web:0.2.2
-```
-
-若本机没有 Docker，可在 CI 或其他构建机上执行，再把 tag 写回 overlay。
-
-### 3.3 创建命名空间与令牌
-
-```bash
-kubectl create namespace situlearn --dry-run=client -o yaml | kubectl apply -f -
-kubectl create secret generic situlearn-secrets -n situlearn \
-  --from-literal=PUBLISH_TOKEN="$(openssl rand -hex 32)" \
-  --dry-run=client -o yaml | kubectl apply -f -
-```
-
-记下这个令牌，发布时要用同一个值。`deploy/k8s/base/secret.yaml` 里的占位值不可直接用于生产。
-
-### 3.4 应用并等待就绪
-
-```bash
-kubectl diff -k deploy/k8s/overlays/prod
-kubectl apply -k deploy/k8s/overlays/prod
-kubectl rollout status deployment/situlearn -n situlearn --timeout=10m
-```
-
-### 3.5 验收服务
-
-```bash
-curl -fsS https://<你的域名>/healthz
-curl -fsS https://<你的域名>/readyz
-curl -fsS https://<你的域名>/metrics | head
-```
-
-### 3.6 发布报告
-
-```bash
-SITULEARN_PUBLISH_TOKEN="<上一步创建的令牌>" \
-  uv run situlearn publish reports/renaissance-p01-v1 \
-  --server https://<你的域名>
-```
-
-然后在 iPad 打开输出的 URL，按 [iPad 真机冒烟](ipad-smoke.md) 的 10 步走一遍。
-
-### 3.7 回滚
-
-- 单条报告有问题：先下架该报告（见第 5 节）。
-- 整体有问题：把 `PUBLISH_ENABLED` 置为 `"false"` 并回滚镜像 tag，再重新 apply。
-
----
-
-## 4. 方式 C：本机 HTTP 开发
-
-只用于本机浏览器调试；iPad 与 PWA 离线能力不适用。
+## 1. 本地 HTTP 开发
 
 ```bash
 export PUBLISH_TOKEN=dev-token
@@ -217,69 +40,194 @@ uv run uvicorn situlearn.web.app:app --host 0.0.0.0 --port 8000
 
 ```bash
 SITULEARN_PUBLISH_TOKEN=dev-token \
-  uv run situlearn publish reports/renaissance-p01-v1 \
-  --server http://localhost:8000
+  uv run situlearn publish reports/demo --server http://localhost:8000
 ```
 
----
-
-## 5. 发布后验收清单
-
-- [ ] `/healthz`、`/readyz` 返回 200。
-- [ ] 公开首页 200，章节数与词条数与本地报告一致。
-- [ ] 音频请求返回 **206**，带 `Content-Range`：
-      `curl -s -o /dev/null -w "%{http_code}\n" -r 0-99 https://<base>/r/<slug>/assets/audio/sec-01-01.mp3`
-- [ ] 重复发布同一报告：返回同一 slug，且 `replaced=True`，不新增报告。
-- [ ] iPad 冒烟 10 步通过（锁屏播放、切 App、续播、主屏幕、离线）。
-- [ ] 需要下架时，公开 URL 返回 410。
-
-### 下架报告
+验证：
 
 ```bash
-curl -sS -X DELETE \
-  -H "Authorization: Bearer $(cat "$HOME/.cache/situlearn/lan-tls/publish_token")" \
-  -o /dev/null -w "%{http_code}\n" \
-  https://192.0.2.10:8443/api/v1/reports/report-ve64nmjnfqdy
+curl -s -o /dev/null -w 'home=%{http_code}\n' http://localhost:8000/r/<slug>
+curl -s -o /dev/null -w 'doc=%{http_code}\n'  http://localhost:8000/r/<slug>/document.json
+curl -s -o /dev/null -w 'media=%{http_code}\n' http://localhost:8000/r/<slug>/media/audio/<file>
 ```
 
-期望 204；随后首页、音频、manifest 均返回 410。重新发布可恢复同一 slug。
+---
 
-### 查看服务端状态
+## 2. 局域网 HTTPS（iPad）
+
+iPad 需要 HTTPS 才能安装 PWA/Service Worker。用本机局域网 IP + 本地 CA：
 
 ```bash
-curl -ksS https://192.0.2.10:8443/metrics | head
+export PUBLISH_TOKEN="$(cat "$HOME/.cache/situlearn/lan-tls/publish_token")"
+export SITE_BASE_URL="https://192.0.2.10:8443"
+export SITULEARN_DATA_DIR="$HOME/.cache/situlearn/lan-web-data-20261104"
+
+uv run uvicorn situlearn.web.app:app \
+  --host 0.0.0.0 --port 8443 \
+  --ssl-keyfile "$HOME/.cache/situlearn/lan-tls/server.key" \
+  --ssl-certfile "$HOME/.cache/situlearn/lan-tls/server.crt"
 ```
 
-关注 `publish_total`、`report_count`、`storage_bytes`。
+发布：
+
+```bash
+SITULEARN_PUBLISH_TOKEN="$(cat "$HOME/.cache/situlearn/lan-tls/publish_token")" \
+  uv run situlearn publish reports/demo --server https://192.0.2.10:8443
+```
+
+iPad 首次访问前按 [iPad 冒烟](ipad-smoke.md) 安装并信任 CA。
 
 ---
 
-## 6. 常见问题
+## 3. 公网 K3s
 
-| 现象 | 原因 | 处理 |
-| --- | --- | --- |
-| `situlearn: invalid choice: 'publish'` | 用的是已安装的 v0.1.3 wheel | 在源码目录用 `uv run situlearn ...`；v0.2.0 wheel 发布后再装 |
-| `401 ERR_PUBLISH_UNAUTHORIZED` | 发布令牌与服务端 `PUBLISH_TOKEN` 不一致 | 两边都从同一个令牌文件读取 |
-| `413` | 报告超过 `MAX_REPORT_BYTES`（默认 100 MiB） | 检查是否误打包了无关大文件 |
-| `422` / `ERR_LOCAL_ASSET` | manifest 引用的音频缺失或为空 | 重新构建报告，或补齐 `assets/audio/` |
-| 发布后 URL 变了 | `SITULEARN_DATA_DIR` 与上次不同 | 指回原来的数据目录，如 `lan-web-data-20261102` |
-| iPad 打不开 | 服务没开、Mac 睡眠、换 Wi-Fi 导致 IP 变化、防火墙拦截 8443 | `curl -k` 自测；确认 IP；必要时改证书 SAN |
-| Safari 证书警告 | iPad 未信任本地 CA | 重新安装 `situlearn-ca.crt` 并开启完全信任 |
-| 端口被占用 | 上次的 uvicorn 未退出 | `lsof -nP -iTCP:8443 -sTCP:LISTEN` 后结束进程 |
-| 锁屏后音乐停 | 未用 HTTPS / 未通过 Safari 播放 / 系统限制 | 确认 URL 是 `https://`，按冒烟清单第 5 步复测 |
+### 3.1 选择 overlay
+
+- `deploy/k8s/overlays/prod/`：ghcr 镜像，未配置 OSS，服务回退到 PVC 本地对象存储。适合单机/试验。
+- `deploy/k8s/overlays/prod-oss/`：阿里云镜像 + OSS 配置。生产推荐。
+
+两个 overlay 的 host、镜像 tag、`SITE_BASE_URL` 都要按实际环境替换。镜像 tag 当前与 `pyproject.toml` 一致：`0.2.2`。
+
+### 3.2 创建 Secret
+
+`prod`（本地存储）：
+
+```bash
+kubectl create secret generic situlearn-secrets -n situlearn \
+  --from-literal=PUBLISH_TOKEN="$PUBLISH_TOKEN" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+`prod-oss`（OSS）：
+
+```bash
+kubectl create secret generic situlearn-secrets -n situlearn \
+  --from-literal=PUBLISH_TOKEN="$PUBLISH_TOKEN" \
+  --from-literal=OSS_ACCESS_KEY_ID="$OSS_ACCESS_KEY_ID" \
+  --from-literal=OSS_ACCESS_KEY_SECRET="$OSS_ACCESS_KEY_SECRET" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+`deployment.yaml` 的 OSS secret ref 是 optional 的；未配置 OSS 时使用本地对象存储。
+
+### 3.3 应用与验收
+
+```bash
+kubectl diff -k deploy/k8s/overlays/prod-oss
+kubectl apply -k deploy/k8s/overlays/prod-oss
+kubectl rollout status deployment/situlearn -n situlearn --timeout=10m
+
+curl -fsS https://<域名>/healthz
+curl -fsS https://<域名>/readyz
+curl -fsS https://<域名>/metrics | head
+```
+
+发布：
+
+```bash
+SITULEARN_PUBLISH_TOKEN="$PUBLISH_TOKEN" \
+  uv run situlearn publish reports/demo --server https://<域名>
+```
 
 ---
 
-## 7. 一页版清单（可打印）
+## 4. 旧报告迁移
 
-```text
-[ ] 终端 1：启动 uvicorn（SITULEARN_DATA_DIR=lan-web-data-20261102，8443，TLS）
-[ ] curl /healthz -> 200
-[ ] 终端 2：situlearn publish reports/renaissance-p01-v1 --server https://192.0.2.10:8443
-[ ] 输出 slug=report-ve64nmjnfqdy，replaced=True
-[ ] curl 公开首页 -> 200
-[ ] curl Range 音频 -> 206
-[ ] iPad Safari 打开 URL，播放一章
-[ ] （每次正式使用）按 ipad-smoke.md 走 10 步
-[ ] 用完 Ctrl+C 停服务
+### 4.1 本地旧报告
+
+```bash
+uv run situlearn migrate reports/old --out reports/migrated
+uv run situlearn render reports/migrated --out reports/migrated-html
 ```
+
+### 4.2 已发布旧 bundle
+
+```bash
+# 1. 从旧服务数据目录导出 manifest bundles
+uv run situlearn export-bundles \
+  --data-dir ~/.cache/situlearn/web-dev \
+  --out exports/bundles
+
+# 2. 批量迁移；输出 publish.json 保留旧 slug
+uv run situlearn migrate-batch exports/bundles --out reports/migrated
+
+# 3. 重新发布（目录里有 publish.json 时自动带 requested_slug）
+uv run situlearn publish reports/migrated/<report_key> --server https://<域名>
+```
+
+旧报告里没有对应词卡的 `key_terms` 会被丢弃并写 warning；这是当前格式的取舍。
+
+---
+
+## 5. 切换与回滚
+
+### 5.1 切换顺序
+
+1. 停止旧发布。
+2. 导出旧 bundle（4.2 第 1 步）。
+3. `migrate-batch` 生成新文档。
+4. 部署新服务端（仓库迁移在启动时执行：`owners`、`owner_id` 回填、复合唯一键、`document_*` 列）。
+5. 重新发布迁移后的报告，`publish.json` 保留旧 slug。
+6. 验证旧 URL 301/308/200（旧 `/assets` 308 到 `/media`）。
+
+### 5.2 回滚
+
+- 保留旧镜像 tag、DB 备份与对象存储中的旧 bundle。
+- 恢复旧服务前，先把 `reports.current_version` re-pin 到迁移前版本；或直接恢复 DB 快照。
+- 新文档不删除；旧服务不读取即可。
+- 回滚窗口内不要清理 `situlearn-data` PVC/OSS 旧前缀。
+
+### 5.3 上线验证
+
+```bash
+curl -fsS https://<域名>/healthz
+curl -fsS https://<域名>/r/<slug>/document.json | python3 -c \
+  'import json,sys; d=json.load(sys.stdin); print(d["format"], len(d["sections"]))'
+curl -s -o /dev/null -w '%{http_code} %{content_type}\n' \
+  https://<域名>/r/<slug>/media/audio/<file>
+```
+
+公开 `document.json` 不应出现 `meta.id`、`meta.source.filename`、`meta.source.sha256`。
+
+---
+
+## 6. 备份与恢复
+
+### 6.1 本地
+
+```bash
+uv run python -m situlearn.web.backup --data-dir <data> --backup-dir <backup> --keep-days 7
+```
+
+### 6.2 OSS
+
+配置 `OSS_*` 后：
+
+```bash
+uv run python -m situlearn.web.backup --keep-days 30
+```
+
+会写 `backups/situlearn-<UTC>.sqlite3` 并清理过期备份。
+
+### 6.3 K3s
+
+`deploy/k8s/base/cronjob.yaml` 每天 03:17 执行。使用 `prod-oss` 时备份写 OSS；使用 `prod` 时写 `situlearn-backup` PVC 的 `/backup`。恢复时：
+
+1. 停服务。
+2. 用最新 SQLite 快照替换 `<data>/situlearn.sqlite3`（OSS 快照先下载）。
+3. 确保对象存储中的报告前缀仍存在。
+4. 启动服务，`/readyz` 200 后抽查 `/r/<slug>` 与 `/media`。
+
+---
+
+## 7. 常见问题
+
+| 现象 | 检查 |
+| --- | --- |
+| `ERR_LOCAL_DOCUMENT` | 目录里没有 `document.json`；旧报告先 `migrate` |
+| `ERR_LOCAL_MANIFEST` | 旧版发布客户端/旧报告；升级 CLI 或先迁移 |
+| 409 slug conflict | `requested_slug` 被其他 report 占用；换 slug 或先下架 |
+| 404 media | 请求的路径不在 `resources[*].href` 中 |
+| `/assets/...` 308 | 预期；新路径是 `/media/...` |
+| 410 | 报告已 unpublish；重新 publish 即可 |
+| 503 | `/readyz` 看 data/object store 依赖 |

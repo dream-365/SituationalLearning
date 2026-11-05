@@ -20,7 +20,26 @@ def verify_publish_token(authorization: str | None, expected: str) -> bool:
     return hmac.compare_digest(value.strip(), expected)
 
 
-def require_publish_token(request: Request) -> None:
+def resolve_owner(authorization: str | None, settings) -> str | None:
+    if not authorization:
+        return None
+    scheme, _, value = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not value:
+        return None
+    token = value.strip()
+    if not token:
+        return None
+    if settings.publish_tokens:
+        for expected, owner_id in settings.publish_tokens.items():
+            if hmac.compare_digest(token, expected):
+                return owner_id
+        return None
+    if settings.publish_token and hmac.compare_digest(token, settings.publish_token):
+        return settings.default_owner_id
+    return None
+
+
+def require_publish_token(request: Request) -> str:
     settings = request.app.state.settings
     metrics = getattr(request.app.state, "metrics", None)
     if request.method == "POST" and not settings.publish_enabled:
@@ -33,9 +52,8 @@ def require_publish_token(request: Request) -> None:
                 "message": "publishing is temporarily disabled",
             },
         )
-    if not verify_publish_token(
-        request.headers.get("Authorization"), settings.publish_token
-    ):
+    owner_id = resolve_owner(request.headers.get("Authorization"), settings)
+    if owner_id is None:
         if metrics is not None and request.method == "POST":
             metrics.record_publish("rejected")
         raise HTTPException(
@@ -46,6 +64,8 @@ def require_publish_token(request: Request) -> None:
             },
             headers={"WWW-Authenticate": "Bearer"},
         )
+    request.state.owner_id = owner_id
+    return owner_id
 
 
 def hash_client_ip(ip: str, salt: str) -> str:

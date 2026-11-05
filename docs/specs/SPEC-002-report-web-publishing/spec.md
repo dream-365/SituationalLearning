@@ -1,14 +1,17 @@
 ---
 type: spec
 status: Approved
+superseded_by: docs/specs/SPEC-004-presentation-format/spec.md
 owner: alang
 depends_on:
   - docs/architecture/system.md
   - docs/specs/SPEC-001-subtitle-learning-report/spec.md
-updated_at: 2026-11-03
+updated_at: 2026-11-04
 ---
 
 # 情景学习 学习报告公网发布与 iPad 播放 技术方案
+
+> **已被 SPEC-004 部分取代（2026-11-04 生效）**：报告格式、发布载荷、`report_key` 契约与媒体路由以 [SPEC-004](../SPEC-004-presentation-format/spec.md) 为准；本 spec 中基于 `manifest.json` 的发布、`/r/{slug}/assets/` 路由与全局 `report_key` 唯一性不再适用。保留作为历史上下文。
 
 | 字段 | 内容 |
 | --- | --- |
@@ -505,6 +508,8 @@ CLI 错误映射：`ERR_PUBLISH_UNAUTHORIZED` → 退出码 `5`；网络错误�
 每个阶段使用不可变镜像 tag；K3s 部署使用 `kubectl apply -k`，发布前执行 `kubectl diff -k`，发布后等待 `rollout status`。
 
 ### 6.2 数据迁移与兼容性
+
+> **SPEC-004 已生效（2026-11-04），本节发布/兼容步骤被取代**：旧报告必须先 `migrate`、再发布；服务端只接受新文档；`/assets` 308 到 `/media`。
 
 - **存量数据**：服务端是新建，没有历史数据库需要迁移；现有本地报告目录不需要转换，首次 `situlearn publish` 即完成导入。
 - **存量报告处理（不做迁移）**：现有 PVC 上的报告不迁移到 OSS。升级步骤为：先下架现有报告，删除 `/data/reports/` 下的本地副本，再从 Mac 用 `situlearn publish` 重新发布；切换后新报告只写 OSS，服务端不再读取 PVC 报告路径。SQLite 中的 `reports` / `publish_events` 记录保留，用于 slug 与审计。
