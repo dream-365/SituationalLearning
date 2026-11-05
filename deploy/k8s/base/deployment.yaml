@@ -25,7 +25,7 @@ spec:
         fsGroup: 10001
       containers:
         - name: web
-          image: situlearn-web:0.4.1
+          image: situlearn-web:0.4.2
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

@@ -22,7 +22,7 @@ spec:
             fsGroup: 10001
           containers:
             - name: backup
-              image: situlearn-web:0.4.1
+              image: situlearn-web:0.4.2
               imagePullPolicy: IfNotPresent
               command:
                 - python

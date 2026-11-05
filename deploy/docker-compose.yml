@@ -1,6 +1,6 @@
 services:
   web:
-    image: ghcr.io/dream-365/situlearn-web:0.4.1
+    image: ghcr.io/dream-365/situlearn-web:0.4.2
     container_name: situlearn-web
     restart: unless-stopped
     ports:

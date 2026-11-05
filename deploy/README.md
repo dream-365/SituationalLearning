@@ -21,7 +21,7 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
 - `deploy/k8s/overlays/prod/`：ghcr 镜像 + PVC 本地对象存储（不配置 OSS）。Secret 只需 `PUBLISH_TOKEN`。
 - `deploy/k8s/overlays/prod-oss/`：阿里云镜像 + OSS，生产推荐。Secret 需要 `PUBLISH_TOKEN`、`OSS_ACCESS_KEY_ID`、`OSS_ACCESS_KEY_SECRET`。
 
-`prod-oss` 的 host、OSS bucket 与 endpoint 都是占位值。真实值放在本地 overlay（如 `deploy/k8s/overlays/local/`，已被 `.gitignore` 忽略）或用本地 patch 覆盖，不要提交。镜像 tag 当前与 `pyproject.toml` 一致：`0.4.1`。
+`prod-oss` 的 host、OSS bucket 与 endpoint 都是占位值。真实值放在本地 overlay（如 `deploy/k8s/overlays/local/`，已被 `.gitignore` 忽略）或用本地 patch 覆盖，不要提交。镜像 tag 当前与 `pyproject.toml` 一致：`0.4.2`。
 
 `deployment.yaml` 的 OSS secret ref 是 optional 的：`prod` 不提供 OSS 密钥时服务使用本地对象存储。
 
