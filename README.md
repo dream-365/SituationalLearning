@@ -38,7 +38,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Install the released CLI:
 
 ```bash
-uv tool install --python 3.12 https://github.com/dream-365/SituationalLearning/releases/download/v0.4.0/situlearn-0.4.0-py3-none-any.whl
+uv tool install --python 3.12 https://github.com/dream-365/SituationalLearning/releases/download/v0.4.1/situlearn-0.4.1-py3-none-any.whl
 ```
 
 If PyPI/GitHub is slow, set `HTTPS_PROXY` to your local proxy before installing.
@@ -192,11 +192,11 @@ The deployment resources live in `deploy/k8s`.
 - `overlays/prod-oss/`：阿里云镜像 + OSS，生产推荐。
 
 Build and push an image first, then update the image tag in the chosen overlay.
-The current package version is `0.4.0`.
+The current package version is `0.4.1`.
 
 ```bash
-docker build -t ghcr.io/dream-365/situlearn-web:0.4.0 .
-docker push ghcr.io/dream-365/situlearn-web:0.4.0
+docker build -t ghcr.io/dream-365/situlearn-web:0.4.1 .
+docker push ghcr.io/dream-365/situlearn-web:0.4.1
 
 kubectl create namespace situlearn --dry-run=client -o yaml | kubectl apply -f -
 # prod-oss: include OSS keys; prod may omit them (secret refs are optional)
