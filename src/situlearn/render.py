@@ -28,6 +28,11 @@ from situlearn.resolver import (
     ResourceNotFound,
 )
 
+# CSP hash for the single inline <script> in templates/document.html.j2.
+# The public web app allows this hash in script-src; tests/test_web_render.py
+# recomputes it from the template so the two cannot drift.
+DOCUMENT_SCRIPT_CSP_HASH = "sha256-dE83AKtlSSccba4n9QHmZQ/Rsq7p4Tf5zLzpmMXlub4="
+
 CATEGORY_LABEL_KEYS = {f"category.{key}": value for key, value in CATEGORY_LABELS.items()}
 DEFAULT_LABELS: dict[str, str] = {
     **dataclasses.asdict(DOCUMENTARY_PROFILE.labels),

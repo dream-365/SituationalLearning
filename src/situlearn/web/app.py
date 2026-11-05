@@ -26,6 +26,7 @@ from starlette.responses import Response, StreamingResponse
 from starlette.staticfiles import StaticFiles
 
 from situlearn import __version__
+from situlearn.render import DOCUMENT_SCRIPT_CSP_HASH
 from situlearn.web.api import router as api_router
 from situlearn.web.auth import SlidingWindowLimiter
 from situlearn.web.config import Settings
@@ -258,7 +259,8 @@ def create_app(settings: Settings | None = None, *, configure_logs: bool = True)
                     response.headers.setdefault(
                         "Content-Security-Policy",
                         "default-src 'self'; media-src 'self'; img-src 'self' data:; "
-                        "style-src 'self' 'unsafe-inline'; script-src 'self'; "
+                        "style-src 'self' 'unsafe-inline'; "
+                        f"script-src 'self' '{DOCUMENT_SCRIPT_CSP_HASH}'; "
                         "connect-src 'self'",
                     )
             return response

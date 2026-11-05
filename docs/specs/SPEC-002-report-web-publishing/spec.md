@@ -303,7 +303,7 @@ oss://<OSS_BUCKET>/<OSS_PREFIX>/             # 默认前缀 situlearn/
 
 - 所有公开页面：`X-Robots-Tag: noindex, nofollow`，HTML 内同时输出 `<meta name="robots" content="noindex, nofollow">`。
 - 所有响应：`Strict-Transport-Security: max-age=31536000; includeSubDomains`。
-- HTML：`Content-Security-Policy: default-src 'self'; media-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'`。
+- HTML：`Content-Security-Policy: default-src 'self'; media-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'sha256-<document.html.j2 内联脚本哈希>'; connect-src 'self'`。内联脚本仅限 document 模板中的单个播放器/筛选脚本，通过 SHA-256 哈希放行；新增或修改内联脚本必须同步更新哈希与回归测试。
 - 音频：`Accept-Ranges: bytes`，正确的 `Content-Type: audio/mpeg`。
 - 页面与音频：`Cache-Control` 使用内容哈希或版本号，避免覆盖更新后缓存串版本。
 

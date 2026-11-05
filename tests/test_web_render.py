@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import re
 from pathlib import Path
 
 from web_fixtures import client, document, publish, settings
+
+import situlearn.render
+from situlearn.render import DOCUMENT_SCRIPT_CSP_HASH
 
 
 def _published(tmp_path: Path, *, kind: str = "documentary"):
@@ -93,3 +99,15 @@ def test_unregistered_media_path_is_rejected(tmp_path: Path) -> None:
     test_client, slug = _published(tmp_path)
     response = test_client.get(f"/r/{slug}/media/audio/not-registered.mp3")
     assert response.status_code == 404
+
+
+def test_csp_allows_document_inline_script(tmp_path: Path) -> None:
+    test_client, slug = _published(tmp_path)
+    response = test_client.get(f"/r/{slug}")
+    csp = response.headers["content-security-policy"]
+    assert f"'{DOCUMENT_SCRIPT_CSP_HASH}'" in csp
+
+    template_path = Path(situlearn.render.__file__).parent / "templates" / "document.html.j2"
+    body = re.search(r"<script>(.*?)</script>", template_path.read_text(), re.DOTALL).group(1)
+    expected = "sha256-" + base64.b64encode(hashlib.sha256(body.encode()).digest()).decode()
+    assert expected == DOCUMENT_SCRIPT_CSP_HASH
