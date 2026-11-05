@@ -298,6 +298,7 @@ oss://<OSS_BUCKET>/<OSS_PREFIX>/             # 默认前缀 situlearn/
 - `GET /r/{slug}/manifest.webmanifest`：该报告的 PWA 清单，`start_url` 为 `/r/{slug}`，`scope` 为 `/r/{slug}/`；`display: standalone`。
 - `GET /sw.js`：Service Worker 脚本，作用域为站点根，便于缓存跨报告公共外壳。
 - `GET /offline`：离线回退页。
+- 公开 HTML 中的媒体引用必须使用 `/r/{slug}/media/...` 绝对路径；`document.json` 与离线 HTML 保持相对 `media/...`。
 
 **响应头约束**
 

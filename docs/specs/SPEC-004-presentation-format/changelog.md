@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-05 — 修复公开页媒体 URL 缺少 slug
+
+- 现象：服务端渲染的 `<img>` / `<audio>` / 播放列表使用文档内的相对 `media/...`，在 `/r/<slug>`（无尾斜杠）下解析为 `/r/media/...`，媒体 404，播放器报错。
+- 修复：Web 渲染前把资源 href 改写为 `/r/<slug>/media/...`；离线 `index.html` 与 `document.json` 仍保留相对 href。
+- 回归测试：首页、章节页、词表页均断言绝对媒体 URL，且不再出现 `src="media/`。
+
 ## 2026-11-05 — 修复公开页 CSP 阻止内联脚本
 
 - 现象：线上 `/r/<slug>` 的 `script-src 'self'` 拦截 document 模板内联脚本，播放器与筛选全部失效。
