@@ -10,7 +10,7 @@ resources:
 images:
   - name: situlearn-web
     newName: registry.cn-hangzhou.aliyuncs.com/afx/situlearn-web
-    newTag: "0.4.1"
+    newTag: "0.4.2"
 
 patches:
   - target:

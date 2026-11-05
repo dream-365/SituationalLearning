@@ -31,6 +31,10 @@ def test_report_home_renders_public_content(tmp_path: Path) -> None:
     assert "<audio" in html
     assert "<img" in html
     assert "word-w-1" in html
+    assert f"/r/{slug}/media/audio/s0.mp3" in html
+    assert f"/r/{slug}/media/audio/term.mp3" in html
+    assert 'src="media/' not in html
+    assert "data-playlist='[\"media/" not in html
 
 
 def test_movie_report_uses_plot_labels(tmp_path: Path) -> None:
@@ -47,6 +51,7 @@ def test_chapter_page_renders_spoken_text(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert "Spoken text for section 1." in response.text
     assert "Spoken text for section 0." not in response.text
+    assert f"/r/{slug}/media/audio/s1.mp3" in response.text
 
 
 def test_vocabulary_page_filters(tmp_path: Path) -> None:
@@ -56,6 +61,7 @@ def test_vocabulary_page_filters(tmp_path: Path) -> None:
     assert 'id="word-w-1"' in response.text
     assert 'data-category-filter="domain_term"' in response.text
     assert "data-word-search" in response.text
+    assert f"/r/{slug}/media/audio/term.mp3" in response.text
 
     empty = test_client.get(f"/r/{slug}/vocabulary?section=s1")
     assert 'id="word-w-1"' not in empty.text

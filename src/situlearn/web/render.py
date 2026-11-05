@@ -97,16 +97,35 @@ def _manifest_url(report: PublicReport) -> str:
     return f"/r/{report.slug}/manifest.webmanifest"
 
 
+def _public_document(document: Document, slug: str) -> Document:
+    """Point resource hrefs at the public /r/<slug>/media/ route.
+
+    Documents store hrefs relative to their own root (``media/...``) so they
+    work offline. A public page lives at ``/r/<slug>`` without a trailing
+    slash, so relative hrefs would resolve to ``/r/media/...``.
+    """
+
+    resources = {
+        resource_id: resource.model_copy(update={"href": f"/r/{slug}/{resource.href}"})
+        for resource_id, resource in document.resources.items()
+    }
+    return document.model_copy(update={"resources": resources})
+
+
 def render_report(report: PublicReport) -> str:
     return render_document_html(
-        report.document, pwa_manifest_url=_manifest_url(report)
+        _public_document(report.document, report.slug),
+        pwa_manifest_url=_manifest_url(report),
     )
 
 
 def render_chapter(report: PublicReport, section_id: str) -> str:
     section = report.section(section_id)
     document = report.document.model_copy(update={"sections": [section]})
-    return render_document_html(document, pwa_manifest_url=_manifest_url(report))
+    return render_document_html(
+        _public_document(document, report.slug),
+        pwa_manifest_url=_manifest_url(report),
+    )
 
 
 def _word_blocks(document: Document) -> list[WordBlock]:
@@ -158,4 +177,7 @@ def render_vocabulary(
     else:
         filtered = vocabulary.model_copy(update={"blocks": words})
         document = report.document.model_copy(update={"sections": [filtered]})
-    return render_document_html(document, pwa_manifest_url=_manifest_url(report))
+    return render_document_html(
+        _public_document(document, report.slug),
+        pwa_manifest_url=_manifest_url(report),
+    )
